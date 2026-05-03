@@ -142,7 +142,7 @@ Se a validação falhar, o sistema tenta uma rodada de correção automática an
 ## Cache e histórico
 
 - Cache: `db/cache/*.json`
-- Histórico: `db/history.db`
+- Histórico: `db/history.db` (gerado automaticamente em runtime)
 
 O histórico é usado como memória contextual para reaproveitar soluções similares.
 

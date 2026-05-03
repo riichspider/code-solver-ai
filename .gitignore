@@ -1,8 +1,12 @@
 __pycache__/
 .pytest_cache/
 .streamlit/
+.venv/
 exports/
 db/cache/
+db/history.db
+db/history.db-*
+db/history.db-journal
 *.pyc
 *.pyo
 *.pyd
