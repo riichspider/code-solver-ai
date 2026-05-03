@@ -9,13 +9,14 @@
 - Pipeline completo: classify → reason → code → validate
 - Auto-repair implementado
 - Error handling consistente com mensagens amigáveis
-- solve_batch centralizado em core/solver.py (sem duplicação)
+- solve_batch centralizado em core/solver.py
 - Test helpers dedicados em tests/test_helpers.py
 - Cache TTL configurável via config.yaml (padrão 24h)
 - Similaridade otimizada com Jaccard pre-filtering
 - Testes multilanguage: TypeScript, Java, Go, Rust (6/6)
 - Truncamentos silenciosos documentados com warnings
-- CONTEXT.md criado para economia de tokens entre sessões
+- README atualizado com exemplos de uso
+- DeepSource integrado ao repositório (PRs #5 e #6 aceitos)
 
 ## Arquitetura
 - core/solver.py — orquestrador principal
@@ -31,14 +32,12 @@
 - main.py — CLI
 
 ## Problemas conhecidos
-- config.yaml aponta para qwen2.5-coder:7b que pode não 
+- config.yaml aponta para qwen2.5-coder:7b que pode não
   estar instalado (fallback automático existe)
-- Similaridade do histórico ainda é O(n) acima de 500 
-  entradas mesmo com Jaccard pre-filtering
 
 ## Próximos passos pendentes
-- Atualizar README com exemplos de uso
 - Rodar Health Check no Revibe para medir progresso real
 - Testar pipeline funcionando com Ollama real no Streamlit
 - Suporte a C++, Ruby, PHP (futuro)
 - LRU eviction no cache (futuro)
+- Suite de benchmarking (futuro)
