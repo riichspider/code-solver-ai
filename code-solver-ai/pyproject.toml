@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code-solver-ai"
+version = "0.1.0"
+description = "Offline AI code solver powered by local Ollama models"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "requests>=2.32.0",
+  "PyYAML>=6.0.2",
+  "streamlit>=1.44.0",
+  "rich>=13.9.4",
+]
+
+[project.scripts]
+code-solver = "main:main"
+
+[tool.setuptools]
+packages = ["core", "models", "utils"]
+py-modules = ["main", "app"]

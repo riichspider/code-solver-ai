@@ -1,0 +1,9 @@
+__pycache__/
+.pytest_cache/
+.streamlit/
+exports/
+db/cache/
+*.pyc
+*.pyo
+*.pyd
+*.log
