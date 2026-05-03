@@ -1,7 +1,7 @@
 # code-solver-ai — contexto para IA
 
 ## Estado atual
-- 20 testes passando (100% pass rate)
+- 24 testes passando (100% pass rate)
 - Python 3.10, Ollama local, Streamlit + CLI
 - Health Score Revibe: ~75 (era 67 antes das melhorias)
 
@@ -19,6 +19,12 @@
 - DeepSource integrado ao repositório (PRs #5 e #6 aceitos)
 - CI com pytest no GitHub Actions (.github/workflows/ci.yml)
 - Validação real para TypeScript (tsc) e Go (go test)
+- Licença MIT adicionada (LICENSE)
+- Health check CLI com --health-check
+- Limpeza automática de exports (max 20 pastas)
+- Python 3.10 declarado corretamente no pyproject.toml
+- SECURITY.md reescrito para v0.1.0
+- Dependabot configurado para pip
 
 ## Arquitetura
 - core/solver.py — orquestrador principal
@@ -34,8 +40,10 @@
 - main.py — CLI
 
 ## Próximos passos pendentes
-- Rodar Health Check no Revibe para medir progresso real
-- Testar pipeline funcionando com Ollama real no Streamlit
-- Suporte a C++, Ruby, PHP (futuro)
-- LRU eviction no cache (futuro)
-- Suite de benchmarking (futuro)
+- Fase 2: badges no README
+- Fase 2: criar CONTRIBUTING.md
+- Fase 2: gravar screenshot/GIF do Streamlit
+- Fase 2: criar CHANGELOG.md
+- Fase 3: templates de Issue e PR
+- Fase 3: configurar pre-commit com ruff
+- Testar pipeline com Ollama real no Streamlit
