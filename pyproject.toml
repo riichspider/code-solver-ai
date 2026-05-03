@@ -22,5 +22,11 @@ code-solver = "main:main"
 packages = ["core", "models", "utils"]
 py-modules = ["main", "app"]
 
+[project.optional-dependencies]
+dev = [
+  "pre-commit>=3.0.0",
+  "pytest>=9.0.0",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
