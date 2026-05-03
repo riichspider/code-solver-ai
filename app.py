@@ -23,12 +23,30 @@ def uploaded_file_to_context(uploaded_file) -> ContextItem:
 
 
 def render_exception(exc: Exception) -> None:
-    st.error("Não foi possível concluir a execução.")
-    st.caption(
-        "Verifique se o Ollama está ativo, se o modelo existe e se o prompt tem contexto suficiente."
-    )
+    # Handle specific error types with friendly messages
+    if isinstance(exc, ConnectionError):
+        st.error("❌ Falha de conexão com o modelo")
+        st.caption("Verifique se o Ollama está ativo e acessível.")
+    elif isinstance(exc, FileNotFoundError):
+        st.error("❌ Arquivo ou modelo não encontrado")
+        st.caption("Verifique se o modelo especificado está instalado no Ollama.")
+    elif isinstance(exc, PermissionError):
+        st.error("❌ Permissão negada")
+        st.caption("Verifique as permissões de acesso aos arquivos e diretórios.")
+    elif isinstance(exc, ValueError):
+        st.error("❌ Valor inválido fornecido")
+        st.caption("Verifique se os parâmetros informados estão corretos.")
+    elif isinstance(exc, RuntimeError):
+        st.error("❌ Erro de execução")
+        st.caption("Ocorreu um erro durante o processamento da solicitação.")
+    else:
+        st.error("❌ Não foi possível concluir a execução.")
+        st.caption(
+            "Verifique se o Ollama está ativo, se o modelo existe e se o prompt tem contexto suficiente."
+        )
+
     with st.expander("Detalhes técnicos"):
-        st.code(str(exc))
+        st.code(f"{type(exc).__name__}: {str(exc)}")
 
 
 def render_single_result(result) -> None:
@@ -38,7 +56,8 @@ def render_single_result(result) -> None:
     col3.metric("Validação", result.validation.get("status", "n/a"))
     col4.metric("Cache", "Sim" if result.cached else "Não")
 
-    st.caption(f"Modelo: `{result.model}` · Labels: {', '.join(result.labels)}")
+    st.caption(
+        f"Modelo: `{result.model}` · Labels: {', '.join(result.labels)}")
 
     overview, code_tab, tests_tab, markdown_tab, memory_tab = st.tabs(
         ["Visão geral", "Código", "Testes", "Markdown", "Memória"]
@@ -93,7 +112,8 @@ def main() -> None:
         layout="wide",
     )
     st.title("🧠 Code Solver AI")
-    st.caption("Resolução local de problemas de programação com Ollama e histórico persistente.")
+    st.caption(
+        "Resolução local de problemas de programação com Ollama e histórico persistente.")
 
     solver = get_solver()
     available_models = solver.available_models() or [solver.default_model]
@@ -106,10 +126,12 @@ def main() -> None:
             index=0,
         )
         mode = st.radio("Modo", options=["fast", "deep"], horizontal=True)
-        language = st.selectbox("Linguagem principal", options=solver.supported_languages)
+        language = st.selectbox("Linguagem principal",
+                                options=solver.supported_languages)
         use_cache = st.checkbox("Usar cache", value=True)
         export_files = st.checkbox("Exportar resultado em disco", value=False)
-        batch_file = st.file_uploader("Arquivo batch (.txt/.md)", type=["txt", "md"])
+        batch_file = st.file_uploader(
+            "Arquivo batch (.txt/.md)", type=["txt", "md"])
         uploaded_context = st.file_uploader(
             "Arquivos de contexto",
             accept_multiple_files=True,
@@ -129,15 +151,18 @@ def main() -> None:
 
     if st.button("Resolver agora", type="primary", use_container_width=True):
         try:
-            context_items = [uploaded_file_to_context(item) for item in uploaded_context or []]
+            context_items = [uploaded_file_to_context(
+                item) for item in uploaded_context or []]
             if inline_code.strip():
-                context_items.append(ContextItem(name="inline_context.txt", content=inline_code))
+                context_items.append(ContextItem(
+                    name="inline_context.txt", content=inline_code))
 
             if batch_file is not None:
                 batch_text = batch_file.getvalue().decode("utf-8", errors="ignore")
                 problems = solver.parse_batch_text(batch_text)
                 if not problems:
-                    st.warning("Nenhum problema válido encontrado no arquivo batch.")
+                    st.warning(
+                        "Nenhum problema válido encontrado no arquivo batch.")
                     return
                 st.success(f"{len(problems)} problema(s) carregado(s).")
                 for index, batch_problem in enumerate(problems, start=1):
@@ -174,7 +199,8 @@ def main() -> None:
             )
             result = solver.solve(request)
             if export_files:
-                solver.export_result(result, BASE_DIR / solver.export_directory)
+                solver.export_result(result, BASE_DIR /
+                                     solver.export_directory)
             render_single_result(result)
         except Exception as exc:
             render_exception(exc)

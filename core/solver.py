@@ -76,26 +76,32 @@ class CodeSolver:
     ) -> None:
         self.base_dir = Path(base_dir)
         self.config = config
-        self.default_model = config.get("default_model", "qwen2.5-coder:latest")
+        self.default_model = config.get(
+            "default_model", "qwen2.5-coder:latest")
         self.supported_languages = config.get(
             "supported_languages",
             ["python", "javascript", "typescript", "java", "go", "rust"],
         )
-        self.export_directory = config.get("export", {}).get("directory", "exports")
+        self.export_directory = config.get(
+            "export", {}).get("directory", "exports")
 
         ollama_config = config.get("ollama", {})
         self.client = client or OllamaClient(
-            base_url=ollama_config.get("base_url", "http://localhost:11434/api"),
+            base_url=ollama_config.get(
+                "base_url", "http://localhost:11434/api"),
             default_model=self.default_model,
             timeout_seconds=ollama_config.get("timeout_seconds", 240),
             keep_alive=ollama_config.get("keep_alive", "10m"),
             default_options=ollama_config.get("options", {}),
         )
 
-        cache_directory = self._resolve_path(config.get("cache", {}).get("directory", "db/cache"))
-        history_path = self._resolve_path(config.get("history", {}).get("database_path", "db/history.db"))
+        cache_directory = self._resolve_path(
+            config.get("cache", {}).get("directory", "db/cache"))
+        history_path = self._resolve_path(config.get(
+            "history", {}).get("database_path", "db/history.db"))
         self.cache_enabled = bool(config.get("cache", {}).get("enabled", True))
-        self.similar_results = int(config.get("history", {}).get("similar_results", 3))
+        self.similar_results = int(config.get(
+            "history", {}).get("similar_results", 3))
 
         self.cache = SolverCache(cache_directory)
         self.history = HistoryStore(history_path)
@@ -114,7 +120,8 @@ class CodeSolver:
         return cls(base_dir=config_file.parent, config=config)
 
     def available_models(self) -> list[str]:
-        configured = list(dict.fromkeys(self.config.get("preferred_models", []) + [self.default_model]))
+        configured = list(dict.fromkeys(self.config.get(
+            "preferred_models", []) + [self.default_model]))
         discovered, _ = self._get_installed_models(refresh=True)
         if discovered:
             return discovered
@@ -132,7 +139,8 @@ class CodeSolver:
         model, model_resolution = self._resolve_model(request.model)
 
         context_text = self._render_context_items(request.context_items)
-        cache_key = self.cache.build_key(problem, language, model, mode, context_text)
+        cache_key = self.cache.build_key(
+            problem, language, model, mode, context_text)
         if request.use_cache and self.cache_enabled:
             cached_payload = self.cache.get(cache_key)
             if cached_payload:
@@ -168,6 +176,8 @@ class CodeSolver:
             options=options,
         )
 
+        solution = None
+        generation_error = None
         try:
             solution = self.coder.generate(
                 problem=problem,
@@ -185,11 +195,16 @@ class CodeSolver:
                 options=options,
             )
         except CodeGenerationError as exc:
-            raise RuntimeError(
-                "Falha ao gerar uma solução executável. "
-                "Tente usar um modelo maior, ativar `--mode deep` ou enviar mais contexto. "
-                f"Detalhe: {exc}"
-            ) from exc
+            generation_error = exc
+            # Create a minimal solution structure for repair attempt
+            solution = {
+                "filename": "solution.py",
+                "test_filename": "test_solution.py",
+                "code": "",
+                "tests": "",
+                "explanation": [f"Generation failed: {str(exc)}"],
+                "notes": ["Auto-repair will be attempted"],
+            }
 
         validation = self.validator.validate(
             language=language,
@@ -200,12 +215,27 @@ class CodeSolver:
         )
 
         repair_applied = False
-        if request.auto_repair and validation.get("status") == "failed":
+        should_attempt_repair = (
+            request.auto_repair and
+            (validation.get("status") == "failed" or generation_error is not None)
+        )
+
+        if should_attempt_repair:
+            # Create validation error for generation failures
+            if generation_error is not None:
+                repair_validation = {
+                    "status": "failed",
+                    "errors": [f"Code generation failed: {str(generation_error)}"],
+                    "details": {"generation_error": True}
+                }
+            else:
+                repair_validation = validation
+
             repaired_solution = self.coder.repair(
                 problem=problem,
                 language=language,
                 previous_solution=solution,
-                validation=validation,
+                validation=repair_validation,
                 model=model,
                 options=options,
             )
@@ -220,6 +250,13 @@ class CodeSolver:
                 solution = repaired_solution
                 validation = repaired_validation
                 repair_applied = True
+            elif generation_error is not None:
+                # If repair also failed after generation error, raise the original error
+                raise RuntimeError(
+                    "Falha ao gerar uma solução executável e a tentativa de reparo também falhou. "
+                    "Tente usar um modelo maior, ativar `--mode deep` ou enviar mais contexto. "
+                    f"Detalhe: {generation_error}"
+                ) from generation_error
 
         metadata = {
             "classification_reason": classification.get("why", ""),
@@ -289,8 +326,10 @@ class CodeSolver:
     ) -> dict[str, str]:
         export_base = export_root or self._resolve_path(self.export_directory)
         export_base.mkdir(parents=True, exist_ok=True)
-        safe_slug = slug or self._slugify(result.classification + "-" + result.problem[:40])
-        output_dir = export_base / f"{safe_slug}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        safe_slug = slug or self._slugify(
+            result.classification + "-" + result.problem[:40])
+        output_dir = export_base / \
+            f"{safe_slug}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         markdown_path = output_dir / "solution.md"
