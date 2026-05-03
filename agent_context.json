@@ -1,0 +1,403 @@
+{
+  "schema_version": "1.0",
+  "project": {
+    "name": "code-solver-ai-main (2)",
+    "type": "language_project",
+    "language": "unknown",
+    "frameworks": [],
+    "total_files": 30,
+    "analyzed_files": 14,
+    "generated_at": "2026-05-03T13:23:51.399459+00:00",
+    "source": "https://www.revibe.codes"
+  },
+  "files": {
+    "app.py": {
+      "role": "This file serves as the entry point for the Streamlit web user interface. It initializes the UI, handles user input, orchestrates the core `CodeSolver` logic, and renders the AI-generated solutions and reports.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "pathlib",
+        "streamlit",
+        "core.solver.CodeSolver",
+        "core.solver.ContextItem",
+        "core.solver.SolveRequest"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "core/solver.py": {
+      "role": "This is the central orchestrator for the Code Solver AI's core business logic. It defines the end-to-end pipeline for solving a programming problem, coordinating various sub-components like classification, reasoning, code generation, and validation.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "json",
+        "re",
+        "dataclasses",
+        "datetime",
+        "pathlib",
+        "typing",
+        "yaml",
+        "core.cache.HistoryStore",
+        "core.cache.SolverCache",
+        "core.classifier.ProblemClassifier",
+        "core.coder.CodeGenerationError",
+        "core.coder.CodeGenerator",
+        "core.reasoner.ProblemReasoner",
+        "core.validator.SolutionValidator",
+        "models.ollama_client.OllamaClient",
+        "utils.markdown.render_solution_markdown"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "core/coder.py": {
+      "role": "This component is responsible for generating the actual code and tests for a given problem by interacting with the LLM, and for attempting to repair solutions if initial validation indicates failures.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "re",
+        "typing",
+        "utils.prompts"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "core/validator.py": {
+      "role": "This component is responsible for securely validating the generated code and tests by executing them in an isolated, sandboxed environment to verify their correctness and functionality.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "shutil",
+        "sys",
+        "tempfile",
+        "pathlib",
+        "typing",
+        "utils.executor.SandboxExecutor"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "core/reasoner.py": {
+      "role": "This component is responsible for the 'reasoning' stage of the problem-solving pipeline, taking an initial problem understanding and classification to generate a detailed plan, identify constraints, risks, and define success criteria for the solution.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "typing",
+        "utils.prompts"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "core/classifier.py": {
+      "role": "This component is responsible for the initial analytical step in the problem-solving pipeline: automatically classifying the type of programming problem, estimating its complexity, detecting the primary language, and suggesting relevant labels.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "typing",
+        "utils.prompts"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "utils/prompts.py": {
+      "role": "This file centralizes the definition and construction of all system and user prompts used to interact with the Ollama LLM across various stages of the code-solving pipeline, including classification, reasoning, code generation, repair, and final report formatting.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "json",
+        "typing"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "models/ollama_client.py": {
+      "role": "This file provides a client for interacting with the local Ollama API, abstracting away the HTTP communication and handling responses, errors, and JSON parsing for LLM operations like listing models and generating text or structured JSON.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "json",
+        "typing",
+        "requests"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "config.yaml": {
+      "role": "This file serves as the central configuration for the Code Solver AI application, defining operational parameters for LLM interaction, caching, history, export, and supported features.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "utils/executor.py": {
+      "role": "This utility provides a sandboxed execution mechanism for running external shell commands, which is critical for the project's core feature of validating AI-generated code solutions.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "subprocess",
+        "time",
+        "dataclasses",
+        "pathlib"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "requirements.txt": {
+      "role": "This file lists all the Python package dependencies required for the Code Solver AI project to function, encompassing libraries for web UI, CLI, HTTP requests, YAML parsing, and testing.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "main.py": {
+      "role": "This is the primary command-line interface (CLI) entry point for the Code Solver AI, responsible for parsing user arguments, orchestrating problem-solving requests, and presenting the results to the user.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "argparse",
+        "json",
+        "sys",
+        "pathlib",
+        "rich.console",
+        "rich.markdown",
+        "rich.panel",
+        "rich.table",
+        "core.solver"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "pyproject.toml": {
+      "role": "This standardized project configuration file defines the Python project's build system, metadata, dependencies, and entry points for both CLI execution and packaging.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    },
+    "core/cache.py": {
+      "role": "This file is responsible for managing two critical forms of persistent storage for the Code Solver AI: a file-based cache for LLM responses and an SQLite database for storing the history of problem-solving sessions, including capabilities for finding similar past solutions.",
+      "description": "",
+      "importance": "medium",
+      "lines": null,
+      "exports": [],
+      "imports": [
+        "json",
+        "sqlite3",
+        "dataclasses",
+        "datetime",
+        "difflib",
+        "hashlib",
+        "pathlib"
+      ],
+      "imported_by": [],
+      "module": null,
+      "technologies": []
+    }
+  },
+  "dependency_graph": {
+    "edges": [],
+    "reverse_index": {}
+  },
+  "modules": [
+    {
+      "id": "ai_ai_problem_understanding_engine",
+      "name": "AI Problem Understanding Engine",
+      "domain": "unknown",
+      "type": "unknown",
+      "description": "This module leverages Large Language Models (LLMs) to perform initial problem analysis. It encompasses the classification of problem types, language detection, complexity assessment, and the generation of a detailed reasoning plan that outlines solution steps, constraints, and success criteria.",
+      "files": [],
+      "file_count": 2,
+      "technologies": [],
+      "depends_on": []
+    },
+    {
+      "id": "ai_ai_code_generation_iterative_repair",
+      "name": "AI Code Generation & Iterative Repair",
+      "domain": "unknown",
+      "type": "unknown",
+      "description": "Responsible for synthesizing executable code and corresponding unit tests based on the problem description and reasoning plan. It also implements an iterative self-correction mechanism, utilizing LLM capabilities to repair generated code and tests when validation feedback indicates failures.",
+      "files": [],
+      "file_count": 1,
+      "technologies": [],
+      "depends_on": []
+    },
+    {
+      "id": "ai_secure_code_validation_execution_sandbox",
+      "name": "Secure Code Validation & Execution Sandbox",
+      "domain": "unknown",
+      "type": "unknown",
+      "description": "Provides a robust and secure environment for executing AI-generated code and its associated tests. It utilizes sandboxed processes to prevent arbitrary code execution risks and captures execution results, including output, errors, and test pass/fail status, for analysis.",
+      "files": [],
+      "file_count": 2,
+      "technologies": [],
+      "depends_on": []
+    },
+    {
+      "id": "ai_problemsolving_workflow_orchestrator",
+      "name": "Problem-Solving Workflow Orchestrator",
+      "domain": "unknown",
+      "type": "unknown",
+      "description": "Acts as the central coordinator for the entire AI-driven problem-solving pipeline. It manages the sequential flow of operations, delegating tasks to specialized sub-components (classification, reasoning, code generation, validation) and overseeing the data exchange between these stages.",
+      "files": [],
+      "file_count": 1,
+      "technologies": [],
+      "depends_on": []
+    },
+    {
+      "id": "ai_llm_integration_prompt_management",
+      "name": "LLM Integration & Prompt Management",
+      "domain": "unknown",
+      "type": "unknown",
+      "description": "This module encapsulates the logic for interacting with local Large Language Models (LLMs) via the Ollama API, handling HTTP requests, response parsing, and error management. It also centralizes the definition and dynamic construction of all system and user prompts used to guide LLM behavior across various stages.",
+      "files": [],
+      "file_count": 2,
+      "technologies": [],
+      "depends_on": []
+    },
+    {
+      "id": "ai_solution_history_caching_service",
+      "name": "Solution History & Caching Service",
+      "domain": "unknown",
+      "type": "unknown",
+      "description": "Manages the persistence of application data, including caching LLM responses to reduce redundant API calls and storing a comprehensive history of problem-solving sessions. This service enables retrieval and review of past solutions, enhancing developer productivity.",
+      "files": [],
+      "file_count": 1,
+      "technologies": [],
+      "depends_on": []
+    },
+    {
+      "id": "ai_user_interface_application_entry_points",
+      "name": "User Interface & Application Entry Points",
+      "domain": "unknown",
+      "type": "unknown",
+      "description": "Provides the various interfaces through which users interact with the Code Solver AI. This includes the Streamlit web application for a rich graphical experience and a command-line interface (CLI) for scriptable or terminal-based interactions.",
+      "files": [],
+      "file_count": 2,
+      "technologies": [],
+      "depends_on": []
+    },
+    {
+      "id": "ai_project_configuration_dependency_management",
+      "name": "Project Configuration & Dependency Management",
+      "domain": "unknown",
+      "type": "unknown",
+      "description": "This module defines the static configuration parameters that govern the application's behavior, such as LLM models, caching settings, and operational flags. It also specifies the external Python package dependencies required for the project's successful execution and deployment.",
+      "files": [],
+      "file_count": 3,
+      "technologies": [],
+      "depends_on": []
+    }
+  ],
+  "architecture": {
+    "pattern": "Streamlit",
+    "summary": "The Code Solver AI is built on a Pipeline Architecture orchestrated by the central `CodeSolver` component, which manages a sequential flow of domain-specific modules for problem classification, reasoning, coding, and validation. The system uses an Adapter pattern via the `Ollama Client` to abstract communication with the Large Language Model. Security is addressed through a Sandbox pattern, where the `Executor` runs and validates potentially unsafe AI-generated code in an isolated environment.",
+    "layers": [
+      {
+        "name": "User Interfaces",
+        "description": "Provides the entry points for user interaction, allowing users to submit programming problems through either a graphical web interface or a command-line tool.",
+        "technologies": [
+          "Streamlit",
+          "Python"
+        ],
+        "key_files": [
+          "app.py",
+          "main.py"
+        ]
+      },
+      {
+        "name": "Orchestration Layer",
+        "description": "The core of the application's business logic. It implements the pipeline pattern, coordinating the sequential execution of the problem-solving stages and managing the data flow between them.",
+        "technologies": [
+          "Python"
+        ],
+        "key_files": [
+          "core/solver.py"
+        ]
+      },
+      {
+        "name": "AI Problem-Solving Pipeline",
+        "description": "A collection of modular, single-responsibility components that represent the distinct business capabilities of the AI. Each component is invoked by the orchestrator to perform a specific task in the problem-solving sequence.",
+        "technologies": [
+          "Python"
+        ],
+        "key_files": [
+          "core/classifier.py",
+          "core/reasoner.py",
+          "core/coder.py",
+          "core/validator.py"
+        ]
+      },
+      {
+        "name": "AI & Execution Services",
+        "description": "Provides underlying services required by the pipeline components. This includes abstracting LLM communication, managing prompt templates, and providing a secure environment for code execution.",
+        "technologies": [
+          "Python",
+          "HTTP"
+        ],
+        "key_files": [
+          "models/ollama_client.py",
+          "utils/prompts.py",
+          "utils/executor.py"
+        ]
+      },
+      {
+        "name": "External Services & Configuration",
+        "description": "Contains external dependencies and application-wide configuration. This includes the LLM service itself and the configuration file defining its behavior.",
+        "technologies": [
+          "Ollama",
+          "YAML"
+        ],
+        "key_files": [
+          "config.yaml"
+        ]
+      }
+    ],
+    "diagram_mermaid": "flowchart TD\n\nsubgraph \"1. User Interfaces\"\n        UI[Streamlit UI<br>app.py]\n        CLI[Command-Line Interface<br>main.py]\n\nend\n\n\nsubgraph \"2. Orchestration Layer\"\n        Solver[CodeSolver Orchestrator<br>core/solver.py]\n\nend\n\n\nsubgraph \"3. AI\nProblem-Solving Pipeline\"\n        direction LR\n        Classifier[1. Classifier<br>core/classifier.py]\n        Reasoner[2. Reasoner<br>core/reasoner.py]\n        Coder[3. Coder<br>core/coder.py]\n        Validator[4. Validator<br>core/validator.py]\n\nend\n\n\nsubgraph \"4. AI & Execution Services\"\n        LLM_Client[Ollama LLM Client<br>models/ollama_client.py]\n        Prompts[Prompt Library<br>utils/prompts.py]\n        Executor[Sandbox Executor<br>utils/executor.py]\n\nend\n\n\nsubgraph \"5. External Services & Configuration\"\n        LLM_Service[('Ollama LLM Service')]\n        Config[Configuration<br>config.yaml]\n\nend\nUI -- User\nRequest  -->  Solver\nCLI -- User\nRequest  -->  Solver\nSolver -- Manages\nPipeline  -->  Classifier\nSolver -- Manages\nPipeline  -->  Reasoner\nSolver -- Manages\nPipeline  -->  Coder\nSolver -- Manages\nPipeline  -->  Validator\nClassifier -- LLM\nCall  -->  LLM_Client\nReasoner -- LLM\nCall  -->  LLM_Client\nCoder -- LLM\nCall  -->  LLM_Client\nValidator -- Executes code\nvia  -->  Executor\nLLM_Client --\nUses  -->  Prompts\nLLM_Client -- HTTP\nRequest  -->  LLM_Service\nSolver -. Reads settings .-> Config\nLLM_Client -. Reads settings .-> Config"
+  },
+  "call_chains": [],
+  "constraints": [],
+  "design_decisions": [],
+  "database": null
+}
