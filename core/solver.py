@@ -324,9 +324,14 @@ class CodeSolver:
         result: SolveResult,
         export_root: Path | None = None,
         slug: str | None = None,
+        max_exports: int = 20,
     ) -> dict[str, str]:
         export_base = export_root or self._resolve_path(self.export_directory)
         export_base.mkdir(parents=True, exist_ok=True)
+
+        # Cleanup old exports if needed
+        self._cleanup_old_exports(export_base, max_exports)
+
         safe_slug = slug or self._slugify(
             result.classification + "-" + result.problem[:40])
         output_dir = export_base / \
@@ -353,6 +358,43 @@ class CodeSolver:
             "tests": str(tests_path),
             "metadata": str(metadata_path),
         }
+
+    def _cleanup_old_exports(self, export_base: Path, max_exports: int) -> None:
+        """Remove oldest export directories if count exceeds max_exports."""
+        if not export_base.exists():
+            return
+
+        # Get all subdirectories (exports) sorted by timestamp in name
+        export_dirs = []
+        for item in export_base.iterdir():
+            if item.is_dir():
+                # Extract timestamp from directory name format: slug-YYYYMMDD-HHMMSS
+                parts = item.name.split('-')
+                if len(parts) >= 3:
+                    try:
+                        # Try to parse timestamp from last parts
+                        timestamp_str = '-'.join(parts[-2:])  # YYYYMMDD-HHMMSS
+                        timestamp = datetime.strptime(
+                            timestamp_str, "%Y%m%d-%H%M%S")
+                        export_dirs.append((timestamp, item))
+                    except (ValueError, IndexError):
+                        # If timestamp parsing fails, use current time (will be considered newest)
+                        export_dirs.append((datetime.now(), item))
+
+        # Sort by timestamp (oldest first)
+        export_dirs.sort(key=lambda x: x[0])
+
+        # Remove oldest directories if count exceeds max_exports
+        if len(export_dirs) > max_exports:
+            # Keep the newest max_exports
+            for timestamp, dir_path in export_dirs[:-max_exports]:
+                try:
+                    import shutil
+                    shutil.rmtree(dir_path)
+                except (OSError, PermissionError) as e:
+                    # Log warning but don't fail the export
+                    print(
+                        f"Warning: Could not remove old export {dir_path}: {e}")
 
     def parse_batch_text(self, text: str) -> list[str]:
         raw = text.replace("\ufeff", "").replace("\r\n", "\n").strip()
