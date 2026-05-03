@@ -23,9 +23,12 @@ def build_parser() -> argparse.ArgumentParser:
         prog="code-solver",
         description="Resolve problemas de programação localmente com Ollama.",
     )
-    parser.add_argument("problem", nargs="?", help="Descrição direta do problema.")
-    parser.add_argument("--problem-file", help="Arquivo .txt/.md com um único problema.")
-    parser.add_argument("--batch-file", help="Arquivo .txt/.md com múltiplos problemas.")
+    parser.add_argument("problem", nargs="?",
+                        help="Descrição direta do problema.")
+    parser.add_argument(
+        "--problem-file", help="Arquivo .txt/.md com um único problema.")
+    parser.add_argument(
+        "--batch-file", help="Arquivo .txt/.md com múltiplos problemas.")
     parser.add_argument(
         "--context-file",
         action="append",
@@ -39,8 +42,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--model", help="Modelo Ollama específico.")
     parser.add_argument("--mode", choices=["fast", "deep"], default="fast")
-    parser.add_argument("--interactive", action="store_true", help="Abre modo interativo.")
-    parser.add_argument("--list-models", action="store_true", help="Lista modelos disponíveis.")
+    parser.add_argument("--interactive", action="store_true",
+                        help="Abre modo interativo.")
+    parser.add_argument("--list-models", action="store_true",
+                        help="Lista modelos disponíveis.")
     parser.add_argument(
         "--compare-models",
         nargs="+",
@@ -51,8 +56,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Diretório para exportar markdown, código, testes e metadata.",
     )
-    parser.add_argument("--no-cache", action="store_true", help="Ignora o cache local.")
-    parser.add_argument("--json", action="store_true", help="Imprime resultado bruto em JSON.")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="Ignora o cache local.")
+    parser.add_argument("--json", action="store_true",
+                        help="Imprime resultado bruto em JSON.")
     return parser
 
 
@@ -130,8 +137,23 @@ def solve_batch(solver: CodeSolver, args: argparse.Namespace) -> None:
     batch_text = read_text_file(args.batch_file)
     problems = solver.parse_batch_text(batch_text)
     if not problems:
-        raise ValueError("Nenhum problema válido foi encontrado no arquivo batch.")
+        raise ValueError(
+            "Nenhum problema válido foi encontrado no arquivo batch.")
 
+    # Create template request for batch processing
+    template_request = SolveRequest(
+        problem="",  # Will be overridden by solve_batch
+        language=args.language,
+        model=args.model,
+        mode=args.mode,
+        context_items=build_context_items(args.context_file),
+        use_cache=not args.no_cache,
+    )
+
+    # Use solver's solve_batch method
+    results = solver.solve_batch(problems, template_request)
+
+    # Display results summary
     summary = Table(title="Resumo do batch")
     summary.add_column("#")
     summary.add_column("Classificação")
@@ -139,16 +161,7 @@ def solve_batch(solver: CodeSolver, args: argparse.Namespace) -> None:
     summary.add_column("Status")
     summary.add_column("Modelo")
 
-    for index, problem in enumerate(problems, start=1):
-        request = SolveRequest(
-            problem=problem,
-            language=args.language,
-            model=args.model,
-            mode=args.mode,
-            context_items=build_context_items(args.context_file),
-            use_cache=not args.no_cache,
-        )
-        result = solver.solve(request)
+    for index, result in enumerate(results, start=1):
         if args.export_dir:
             solver.export_result(
                 result,
@@ -200,7 +213,8 @@ def compare_models(solver: CodeSolver, problem: str, args: argparse.Namespace) -
 
 
 def run_interactive(solver: CodeSolver, args: argparse.Namespace) -> None:
-    console.print("[bold green]Modo interativo iniciado.[/bold green] Digite uma linha vazia para sair.")
+    console.print(
+        "[bold green]Modo interativo iniciado.[/bold green] Digite uma linha vazia para sair.")
     while True:
         problem = console.input("\n[bold cyan]Problema[/bold cyan]> ").strip()
         if not problem:
@@ -237,7 +251,8 @@ def main() -> None:
 
         problem = resolve_problem_argument(args)
         if not problem:
-            parser.error("Informe um problema, --problem-file, --batch-file ou use --interactive.")
+            parser.error(
+                "Informe um problema, --problem-file, --batch-file ou use --interactive.")
 
         if args.compare_models:
             compare_models(solver, problem, args)
