@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from typing import Any
 
 
@@ -9,12 +10,22 @@ def _serialize_similar_context(similar_context: list[dict[str, Any]]) -> str:
         return "No similar history available."
     compact = []
     for item in similar_context:
+        problem_text = item.get("problem", "")
+        # TRUNCATION_LIMIT: 260 chars for problem context
+        truncated_problem = problem_text[:260]
+        if len(problem_text) > 260:
+            warnings.warn(
+                f"Problem text truncated from {len(problem_text)} to 260 characters for LLM context. "
+                f"Original: '{problem_text[:50]}...'",
+                UserWarning,
+                stacklevel=3
+            )
         compact.append(
             {
                 "score": round(float(item.get("score", 0.0)), 3),
                 "classification": item.get("classification", ""),
                 "language": item.get("language", ""),
-                "problem": item.get("problem", "")[:260],
+                "problem": truncated_problem,
                 "labels": item.get("labels", []),
             }
         )

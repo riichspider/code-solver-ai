@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import warnings
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
@@ -154,8 +155,10 @@ class HistoryStore:
                     result_payload["markdown"],
                     result_payload["code"],
                     result_payload["tests"],
-                    json.dumps(result_payload["explanation"], ensure_ascii=False),
-                    json.dumps(result_payload["validation"], ensure_ascii=False),
+                    json.dumps(
+                        result_payload["explanation"], ensure_ascii=False),
+                    json.dumps(
+                        result_payload["validation"], ensure_ascii=False),
                     json.dumps(result_payload["metadata"], ensure_ascii=False),
                 ),
             )
@@ -189,21 +192,33 @@ class HistoryStore:
                 normalized_problem,
                 row["normalized_problem"],
             ).ratio()
-            shared_terms = set(normalized_problem.split()) & set(row["normalized_problem"].split())
+            shared_terms = set(normalized_problem.split()) & set(
+                row["normalized_problem"].split())
             jaccard = len(shared_terms) / max(
                 1,
-                len(set(normalized_problem.split()) | set(row["normalized_problem"].split())),
+                len(set(normalized_problem.split()) | set(
+                    row["normalized_problem"].split())),
             )
             score = (sequence_score + jaccard) / 2
             if score < 0.18:
                 continue
+            markdown_text = row["markdown"]
+            # TRUNCATION_LIMIT: 900 chars for solution excerpt
+            solution_excerpt = markdown_text[:900]
+            if len(markdown_text) > 900:
+                warnings.warn(
+                    f"Markdown solution truncated from {len(markdown_text)} to 900 characters for similarity matching. "
+                    f"Original starts with: '{markdown_text[:50]}...'",
+                    UserWarning,
+                    stacklevel=3
+                )
             scored.append(
                 SimilarSolution(
                     score=score,
                     problem=row["problem_text"],
                     classification=row["classification"],
                     language=row["language"],
-                    solution_excerpt=row["markdown"][:900],
+                    solution_excerpt=solution_excerpt,
                     labels=json.loads(row["labels_json"]),
                 )
             )
