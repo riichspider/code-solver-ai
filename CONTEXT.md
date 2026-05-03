@@ -4,6 +4,7 @@
 - 24 testes passando (100% pass rate)
 - Python 3.10, Ollama local, Streamlit + CLI
 - Health Score Revibe: ~75 (era 67 antes das melhorias)
+- Fase 1, 2 e 3 do roadmap concluídas
 
 ## O que já foi feito
 - Pipeline completo: classify → reason → code → validate
@@ -25,6 +26,12 @@
 - Python 3.10 declarado corretamente no pyproject.toml
 - SECURITY.md reescrito para v0.1.0
 - Dependabot configurado para pip
+- pre-commit configurado com ruff
+- Roadmap público no README
+- Release automático via GitHub Actions
+- Templates de Issue e PR
+- CHANGELOG.md e CONTRIBUTING.md
+- Badges no README
 
 ## Arquitetura
 - core/solver.py — orquestrador principal
@@ -40,10 +47,8 @@
 - main.py — CLI
 
 ## Próximos passos pendentes
-- Fase 2: badges no README
-- Fase 2: criar CONTRIBUTING.md
-- Fase 2: gravar screenshot/GIF do Streamlit
-- Fase 2: criar CHANGELOG.md
-- Fase 3: templates de Issue e PR
-- Fase 3: configurar pre-commit com ruff
 - Testar pipeline com Ollama real no Streamlit
+- Suporte a C++, Ruby, PHP (futuro)
+- LRU eviction no cache (futuro)
+- Plugin para VS Code (futuro)
+- Suite de benchmarking (futuro)
