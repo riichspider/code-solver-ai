@@ -21,8 +21,8 @@ class SolverCache:
         self.directory.mkdir(parents=True, exist_ok=True)
         self.ttl = timedelta(hours=ttl_hours)
 
+    @staticmethod
     def build_key(
-        self,
         problem: str,
         language: str,
         model: str,

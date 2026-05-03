@@ -2,7 +2,8 @@ from core.solver import CodeSolver
 
 
 class FakeOllamaClient:
-    def list_models(self):
+    @staticmethod
+    def list_models():
         return ["fake-model"]
 
 

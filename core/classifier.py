@@ -98,7 +98,8 @@ class ProblemClassifier:
             "why": why,
         }
 
-    def _detect_language(self, language_hint: str, combined_text: str) -> str:
+    @staticmethod
+    def _detect_language(language_hint: str, combined_text: str) -> str:
         if language_hint:
             return language_hint.strip().lower()
         if "typescript" in combined_text or ".ts" in combined_text:
@@ -113,8 +114,8 @@ class ProblemClassifier:
             return "java"
         return "python"
 
+    @staticmethod
     def _normalize_labels(
-        self,
         labels: list[Any],
         classification: str,
         language: str,

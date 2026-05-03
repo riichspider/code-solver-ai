@@ -397,7 +397,8 @@ class CodeSolver:
         base_options.update(profile)
         return base_options
 
-    def _render_context_items(self, items: list[ContextItem]) -> str:
+    @staticmethod
+    def _render_context_items(items: list[ContextItem]) -> str:
         if not items:
             return ""
         sections: list[str] = []
@@ -457,5 +458,6 @@ class CodeSolver:
         self._installed_models_cache = installed
         return installed, None
 
-    def _clean_batch_item(self, text: str) -> str:
+    @staticmethod
+    def _clean_batch_item(text: str) -> str:
         return text.strip().strip("#").strip()

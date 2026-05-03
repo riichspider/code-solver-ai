@@ -56,8 +56,8 @@ class ProblemReasoner:
             "success_criteria": self._clean_list(success_criteria, fallback["success_criteria"]),
         }
 
+    @staticmethod
     def _fallback(
-        self,
         problem: str,
         classification: str,
         complexity: int,

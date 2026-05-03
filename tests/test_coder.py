@@ -27,7 +27,8 @@ class RetryClient:
 
 
 class BrokenRepairClient:
-    def generate_json(self, **kwargs):
+    @staticmethod
+    def generate_json(**kwargs):
         raise RuntimeError("bad response")
 
 

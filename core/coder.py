@@ -138,42 +138,4 @@ class CodeGenerator:
             notes = [notes]
         notes = [str(item).strip() for item in notes if str(item).strip()]
 
-        code = self._normalize_generated_block(str(payload.get("code", "")).strip())
-        tests = self._normalize_generated_block(str(payload.get("tests", "")).strip())
-        if not code:
-            raise CodeGenerationError("O modelo não retornou código utilizável.")
-
-        return {
-            "filename": filename,
-            "test_filename": test_filename,
-            "code": code,
-            "tests": tests,
-            "explanation": explanation or ["Solução gerada com foco em correção, clareza e testabilidade."],
-            "notes": notes,
-        }
-
-    def _normalize_generated_block(self, text: str) -> str:
-        cleaned = self._strip_code_fences(text)
-        cleaned = cleaned.replace("\r\n", "\n")
-        if self._looks_escaped_multiline(cleaned):
-            cleaned = (
-                cleaned.replace("\\r\\n", "\n")
-                .replace("\\n", "\n")
-                .replace("\\t", "\t")
-            )
-        return cleaned.strip()
-
-    def _strip_code_fences(self, text: str) -> str:
-        cleaned = text.strip()
-        fence_match = re.search(r"```(?:[\w.+-]+)?\s*\n?(.*?)```", cleaned, re.DOTALL)
-        if fence_match:
-            return fence_match.group(1).strip()
-
-        cleaned = re.sub(r"^\s*```(?:[\w.+-]+)?\s*\n?", "", cleaned)
-        cleaned = re.sub(r"\n?```\s*$", "", cleaned)
-        return cleaned
-
-    def _looks_escaped_multiline(self, text: str) -> bool:
-        escaped_layout = text.count("\\n") + text.count("\\t")
-        actual_newlines = text.count("\n")
-        return escaped_layout >= 2 and escaped_layout > max(1, actual_newlines)
+    ```(?:[\w.+-]+)?\s*\n?(.*?)
