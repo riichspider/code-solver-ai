@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Iterable
@@ -60,6 +61,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Ignora o cache local.")
     parser.add_argument("--json", action="store_true",
                         help="Imprime resultado bruto em JSON.")
+    parser.add_argument("--health-check", action="store_true",
+                        help="Verifica saúde do sistema (Ollama, modelos, diretórios).")
     return parser
 
 
@@ -212,6 +215,180 @@ def compare_models(solver: CodeSolver, problem: str, args: argparse.Namespace) -
     console.print(comparison)
 
 
+def health_check(solver: CodeSolver) -> None:
+    """Verifica saúde do sistema e exibe resumo colorido."""
+    console.print("[bold blue]🔍 Code Solver AI - Health Check[/bold blue]\n")
+
+    # Create results table
+    results = Table(title="Verificação do Sistema")
+    results.add_column("Componente", style="bold")
+    results.add_column("Status", justify="center")
+    results.add_column("Detalhes")
+
+    # 1. Check Ollama accessibility
+    try:
+        models = solver.available_models()
+        results.add_row(
+            "Ollama Service",
+            "[green]✓ OK[/green]",
+            f"{len(models)} modelos disponíveis"
+        )
+        ollama_ok = True
+    except Exception as e:
+        results.add_row(
+            "Ollama Service",
+            "[red]✗ FALHA[/red]",
+            f"Erro: {str(e)[:50]}..."
+        )
+        ollama_ok = False
+
+    # 2. List installed models
+    if ollama_ok:
+        try:
+            models = solver.available_models()
+            if models:
+                model_list = ", ".join(models[:3])
+                if len(models) > 3:
+                    model_list += f" (+{len(models)-3})"
+                results.add_row(
+                    "Modelos Instalados",
+                    "[green]✓ OK[/green]",
+                    model_list
+                )
+            else:
+                results.add_row(
+                    "Modelos Instalados",
+                    "[yellow]⚠ AVISO[/yellow]",
+                    "Nenhum modelo encontrado"
+                )
+        except Exception as e:
+            results.add_row(
+                "Modelos Instalados",
+                "[red]✗ FALHA[/red]",
+                f"Erro: {str(e)[:50]}..."
+            )
+
+    # 3. Check Python
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    results.add_row(
+        "Python",
+        "[green]✓ OK[/green]",
+        f"v{python_version}"
+    )
+
+    # 4. Check Node.js
+    if shutil.which("node") is not None:
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["node", "--version"], capture_output=True, text=True, timeout=5)
+            node_version = result.stdout.strip()
+            results.add_row(
+                "Node.js",
+                "[green]✓ OK[/green]",
+                node_version
+            )
+        except Exception:
+            results.add_row(
+                "Node.js",
+                "[yellow]⚠ AVISO[/yellow]",
+                "Instalado mas não acessível"
+            )
+    else:
+        results.add_row(
+            "Node.js",
+            "[yellow]⚠ AVISO[/yellow]",
+            "Não encontrado (validação JS/TS limitada)"
+        )
+
+    # 5. Check db/ directory
+    db_dir = BASE_DIR / "db"
+    if db_dir.exists():
+        if db_dir.is_dir():
+            cache_dir = db_dir / "cache"
+            cache_count = len(list(cache_dir.glob("*.json"))
+                              ) if cache_dir.exists() else 0
+            results.add_row(
+                "Diretório db/",
+                "[green]✓ OK[/green]",
+                f"Acessível, {cache_count} arquivos cache"
+            )
+        else:
+            results.add_row(
+                "Diretório db/",
+                "[red]✗ FALHA[/red]",
+                "Caminho existe mas não é diretório"
+            )
+    else:
+        try:
+            db_dir.mkdir(parents=True, exist_ok=True)
+            (db_dir / "cache").mkdir(exist_ok=True)
+            results.add_row(
+                "Diretório db/",
+                "[green]✓ OK[/green]",
+                "Criado com sucesso"
+            )
+        except Exception as e:
+            results.add_row(
+                "Diretório db/",
+                "[red]✗ FALHA[/red]",
+                f"Erro ao criar: {str(e)[:50]}..."
+            )
+
+    # 6. Check exports/ directory
+    exports_dir = BASE_DIR / "exports"
+    if exports_dir.exists():
+        if exports_dir.is_dir():
+            results.add_row(
+                "Diretório exports/",
+                "[green]✓ OK[/green]",
+                "Acessível para exportações"
+            )
+        else:
+            results.add_row(
+                "Diretório exports/",
+                "[red]✗ FALHA[/red]",
+                "Caminho existe mas não é diretório"
+            )
+    else:
+        try:
+            exports_dir.mkdir(parents=True, exist_ok=True)
+            results.add_row(
+                "Diretório exports/",
+                "[green]✓ OK[/green]",
+                "Criado com sucesso"
+            )
+        except Exception as e:
+            results.add_row(
+                "Diretório exports/",
+                "[red]✗ FALHA[/red]",
+                f"Erro ao criar: {str(e)[:50]}..."
+            )
+
+    # Display results
+    console.print(results)
+
+    # Summary
+    results_str = str(results)
+    ok_count = len([row for row in results_str.split('\n') if '✓ OK' in row])
+    warning_count = len(
+        [row for row in results_str.split('\n') if '⚠ AVISO' in row])
+    fail_count = len(
+        [row for row in results_str.split('\n') if '✗ FALHA' in row])
+
+    console.print("\n[bold]Resumo:[/bold]")
+    if fail_count == 0:
+        if warning_count == 0:
+            console.print(
+                "[green]🎉 Sistema saudável! Todos os componentes funcionando.[/green]")
+        else:
+            console.print(
+                f"[yellow]⚠️ Sistema funcional com {warning_count} avisos.[/yellow]")
+    else:
+        console.print(
+            f"[red]❌ {fail_count} componente(s) com falha. Verifique acima.[/red]")
+
+
 def run_interactive(solver: CodeSolver, args: argparse.Namespace) -> None:
     console.print(
         "[bold green]Modo interativo iniciado.[/bold green] Digite uma linha vazia para sair.")
@@ -239,6 +416,10 @@ def main() -> None:
             for model_name in models:
                 model_table.add_row(model_name)
             console.print(model_table)
+            return
+
+        if args.health_check:
+            health_check(solver)
             return
 
         if args.batch_file:
