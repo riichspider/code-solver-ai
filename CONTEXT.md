@@ -18,6 +18,7 @@
 - README atualizado com exemplos de uso
 - DeepSource integrado ao repositório (PRs #5 e #6 aceitos)
 - CI com pytest no GitHub Actions (.github/workflows/ci.yml)
+- Validação real para TypeScript (tsc) e Go (go test)
 
 ## Arquitetura
 - core/solver.py — orquestrador principal
