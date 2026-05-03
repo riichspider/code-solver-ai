@@ -409,6 +409,48 @@ python -m pytest
 - **CPU**: 4+ cores recomendados para performance
 - **Disco**: 10GB+ para modelos Ollama
 
+## Roadmap
+
+### ✅ Version 0.1.0 (Current)
+- [x] Complete pipeline: classify → reason → code → validate
+- [x] Auto-repair functionality with intelligent fallback
+- [x] Multi-language support: Python, JavaScript, TypeScript, Java, Go, Rust
+- [x] Configurable cache with TTL (24h default)
+- [x] CLI and Streamlit web interface
+- [x] Health check system with --health-check
+- [x] Automatic exports cleanup (max 20 folders)
+- [x] Real validation for TypeScript (tsc) and Go (go test)
+- [x] CI/CD with GitHub Actions and pytest
+- [x] Professional documentation (README, CONTRIBUTING, CHANGELOG, SECURITY)
+- [x] Pre-commit hooks with ruff linting and formatting
+- [x] Issue and PR templates for community contributions
+- [x] MIT license and Dependabot configuration
+
+### 🚀 Planned Features
+
+#### Version 0.2.0
+- [ ] **C++ support** - Code generation and validation
+- [ ] **Ruby support** - Code generation and validation  
+- [ ] **PHP support** - Code generation and validation
+- [ ] **LRU eviction** - Smart cache management for large datasets
+- [ ] **Benchmarking suite** - Performance testing and comparison
+- [ ] **Enhanced web UI** - Improved Streamlit interface with more features
+- [ ] **VS Code extension** - Direct integration with code editor
+
+#### Future Versions
+- [ ] **Parallel processing** - Batch processing optimization
+- [ ] **Plugin system** - Extensible architecture for custom validators
+- [ ] **Model fine-tuning** - Custom model training for specific domains
+- [ ] **Cloud deployment** - Optional cloud-based processing
+- [ ] **Team collaboration** - Shared solutions and team workflows
+
+### 📊 Progress Tracking
+- **Current**: 24 tests passing (100% pass rate)
+- **Languages**: 6 supported (expanding to 9)
+- **CI/CD**: Full automation with GitHub Actions
+- **Documentation**: Complete and professional
+- **Community**: Ready for contributions
+
 ## Observações
 
 - ✅ **100% local** - sem APIs pagas, sem envio de código
