@@ -32,10 +32,6 @@
 - app.py — Web UI Streamlit
 - main.py — CLI
 
-## Problemas conhecidos
-- config.yaml aponta para qwen2.5-coder:7b que pode não
-  estar instalado (fallback automático existe)
-
 ## Próximos passos pendentes
 - Rodar Health Check no Revibe para medir progresso real
 - Testar pipeline funcionando com Ollama real no Streamlit
