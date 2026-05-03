@@ -12,7 +12,8 @@
 - Test helpers em tests/test_helpers.py
 - Cache TTL configurável via config.yaml (padrão 24h)
 - Similaridade otimizada com Jaccard pre-filtering
+- Testes multilanguage: TypeScript, Java, Go, Rust (6/6)
 
 ## Próximos passos pendentes
-- Validar testes para TypeScript, Java, Go, Rust
 - Atualizar README com exemplos de uso
+- Rodar Health Check no Revibe para medir progresso

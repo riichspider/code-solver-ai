@@ -84,6 +84,28 @@ Sem instalar como pacote:
 python main.py "Implemente busca binária iterativa em Python com testes."
 ```
 
+### Exemplos por Linguagem
+
+```bash
+# Python
+python main.py "Crie uma classe para gerenciar tarefas" --language python
+
+# JavaScript  
+python main.py "Implemente função debounce" --language javascript
+
+# TypeScript
+python main.py "Crie interface TypeScript com validação" --language typescript
+
+# Java
+python main.py "Implemente classe Java para conexões" --language java
+
+# Go
+python main.py "Crie servidor HTTP com endpoints REST" --language go
+
+# Rust
+python main.py "Implemente estrutura Rust para arquivos" --language rust
+```
+
 Com arquivo de contexto:
 
 ```bash
