@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Iterable
 
@@ -118,7 +119,9 @@ def solve_single(
     if args.export_dir:
         export_paths = solver.export_result(result, BASE_DIR / args.export_dir)
     if args.json:
-        console.print_json(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+        payload = json.dumps(result.to_dict(), ensure_ascii=False, indent=2)
+        sys.stdout.buffer.write(payload.encode("utf-8"))
+        sys.stdout.buffer.write(b"\n")
         return
     render_result(result, export_paths)
 
@@ -203,40 +206,47 @@ def run_interactive(solver: CodeSolver, args: argparse.Namespace) -> None:
         if not problem:
             console.print("Encerrando.")
             break
-        solve_single(solver, problem, args)
+        try:
+            solve_single(solver, problem, args)
+        except Exception as exc:
+            console.print(f"[bold red]Erro:[/bold red] {exc}")
 
 
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-    solver = CodeSolver.from_config(BASE_DIR / "config.yaml")
+    try:
+        solver = CodeSolver.from_config(BASE_DIR / "config.yaml")
 
-    if args.list_models:
-        models = solver.available_models()
-        model_table = Table(title="Modelos disponíveis")
-        model_table.add_column("Nome")
-        for model_name in models:
-            model_table.add_row(model_name)
-        console.print(model_table)
-        return
+        if args.list_models:
+            models = solver.available_models()
+            model_table = Table(title="Modelos disponíveis")
+            model_table.add_column("Nome")
+            for model_name in models:
+                model_table.add_row(model_name)
+            console.print(model_table)
+            return
 
-    if args.batch_file:
-        solve_batch(solver, args)
-        return
+        if args.batch_file:
+            solve_batch(solver, args)
+            return
 
-    if args.interactive:
-        run_interactive(solver, args)
-        return
+        if args.interactive:
+            run_interactive(solver, args)
+            return
 
-    problem = resolve_problem_argument(args)
-    if not problem:
-        parser.error("Informe um problema, --problem-file, --batch-file ou use --interactive.")
+        problem = resolve_problem_argument(args)
+        if not problem:
+            parser.error("Informe um problema, --problem-file, --batch-file ou use --interactive.")
 
-    if args.compare_models:
-        compare_models(solver, problem, args)
-        return
+        if args.compare_models:
+            compare_models(solver, problem, args)
+            return
 
-    solve_single(solver, problem, args)
+        solve_single(solver, problem, args)
+    except Exception as exc:
+        console.print(f"[bold red]Erro:[/bold red] {exc}")
+        raise SystemExit(1) from exc
 
 
 if __name__ == "__main__":

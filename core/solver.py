@@ -9,7 +9,7 @@ from typing import Any
 
 from core.cache import HistoryStore, SolverCache
 from core.classifier import ProblemClassifier
-from core.coder import CodeGenerator
+from core.coder import CodeGenerationError, CodeGenerator
 from core.reasoner import ProblemReasoner
 from core.validator import SolutionValidator
 from models.ollama_client import OllamaClient
@@ -76,7 +76,7 @@ class CodeSolver:
     ) -> None:
         self.base_dir = Path(base_dir)
         self.config = config
-        self.default_model = config.get("default_model", "qwen2.5-coder:7b")
+        self.default_model = config.get("default_model", "qwen2.5-coder:latest")
         self.supported_languages = config.get(
             "supported_languages",
             ["python", "javascript", "typescript", "java", "go", "rust"],
@@ -115,12 +115,10 @@ class CodeSolver:
 
     def available_models(self) -> list[str]:
         configured = list(dict.fromkeys(self.config.get("preferred_models", []) + [self.default_model]))
-        try:
-            discovered = self.client.list_models()
-        except Exception:
-            return configured
-        self._installed_models_cache = discovered
-        return discovered or configured
+        discovered, _ = self._get_installed_models(refresh=True)
+        if discovered:
+            return discovered
+        return configured
 
     def solve(self, request: SolveRequest) -> SolveResult:
         problem = request.problem.strip()
@@ -131,7 +129,7 @@ class CodeSolver:
         if language not in self.supported_languages:
             language = "python"
         mode = request.mode if request.mode in {"fast", "deep"} else "fast"
-        model = self._resolve_model(request.model)
+        model, model_resolution = self._resolve_model(request.model)
 
         context_text = self._render_context_items(request.context_items)
         cache_key = self.cache.build_key(problem, language, model, mode, context_text)
@@ -170,21 +168,28 @@ class CodeSolver:
             options=options,
         )
 
-        solution = self.coder.generate(
-            problem=problem,
-            classification=classification["classification"],
-            language=language,
-            understanding=reasoning["understanding"],
-            plan_steps=reasoning["plan_steps"],
-            constraints=reasoning["constraints"],
-            risks=reasoning["risks"],
-            success_criteria=reasoning["success_criteria"],
-            context_text=context_text,
-            similar_context=similar_context,
-            model=model,
-            mode=mode,
-            options=options,
-        )
+        try:
+            solution = self.coder.generate(
+                problem=problem,
+                classification=classification["classification"],
+                language=language,
+                understanding=reasoning["understanding"],
+                plan_steps=reasoning["plan_steps"],
+                constraints=reasoning["constraints"],
+                risks=reasoning["risks"],
+                success_criteria=reasoning["success_criteria"],
+                context_text=context_text,
+                similar_context=similar_context,
+                model=model,
+                mode=mode,
+                options=options,
+            )
+        except CodeGenerationError as exc:
+            raise RuntimeError(
+                "Falha ao gerar uma solução executável. "
+                "Tente usar um modelo maior, ativar `--mode deep` ou enviar mais contexto. "
+                f"Detalhe: {exc}"
+            ) from exc
 
         validation = self.validator.validate(
             language=language,
@@ -224,6 +229,7 @@ class CodeSolver:
             "similar_context_count": len(similar_context),
             "default_model_requested": request.model is None,
             "configured_default_model": self.default_model,
+            "model_resolution": model_resolution,
         }
 
         result = SolveResult(
@@ -309,19 +315,37 @@ class CodeSolver:
         }
 
     def parse_batch_text(self, text: str) -> list[str]:
-        raw = text.strip()
+        raw = text.replace("\ufeff", "").replace("\r\n", "\n").strip()
         if not raw:
             return []
-        if "\n---\n" in raw:
-            parts = raw.split("\n---\n")
-        else:
-            parts = re.split(r"\n\s*\n", raw)
-        cleaned = [part.strip(" \n#-*") for part in parts if part.strip()]
-        if len(cleaned) == 1 and "\n" in cleaned[0]:
-            lines = [line.strip("-• ").strip() for line in cleaned[0].splitlines() if line.strip()]
-            if len(lines) > 1:
-                return lines
-        return cleaned
+
+        parts = [
+            self._clean_batch_item(part)
+            for part in re.split(r"(?m)^\s*---\s*$", raw)
+            if part.strip()
+        ]
+        if len(parts) > 1:
+            return [part for part in parts if part]
+
+        paragraphs = [
+            self._clean_batch_item(part)
+            for part in re.split(r"\n\s*\n", raw)
+            if part.strip()
+        ]
+        if len(paragraphs) > 1:
+            return [part for part in paragraphs if part]
+
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        bullet_pattern = re.compile(r"^(?:[-*•]|\d+[.)])\s+")
+        if len(lines) > 1 and all(bullet_pattern.match(line) for line in lines):
+            return [
+                self._clean_batch_item(bullet_pattern.sub("", line, count=1))
+                for line in lines
+                if self._clean_batch_item(bullet_pattern.sub("", line, count=1))
+            ]
+
+        cleaned = self._clean_batch_item(raw)
+        return [cleaned] if cleaned else []
 
     def _resolve_path(self, relative_path: str) -> Path:
         return (self.base_dir / relative_path).resolve()
@@ -345,25 +369,53 @@ class CodeSolver:
         slug = re.sub(r"[^a-zA-Z0-9]+", "-", text.lower()).strip("-")
         return slug[:50] or "solution"
 
-    def _resolve_model(self, requested_model: str | None) -> str:
-        if requested_model:
-            return requested_model
+    def _resolve_model(self, requested_model: str | None) -> tuple[str, dict[str, Any]]:
+        installed, lookup_error = self._get_installed_models()
+        metadata = {
+            "requested_model": requested_model,
+            "configured_default_model": self.default_model,
+            "resolved_model": None,
+            "fallback_used": False,
+            "lookup_error": str(lookup_error) if lookup_error else "",
+            "available_models": installed,
+        }
 
-        installed = self._installed_models_cache
-        if installed is None:
-            try:
-                installed = self.client.list_models()
-            except Exception:
-                installed = []
-            self._installed_models_cache = installed
+        if requested_model:
+            if installed and requested_model not in installed:
+                raise ValueError(
+                    f"Modelo solicitado '{requested_model}' não está instalado no Ollama. "
+                    f"Disponíveis: {', '.join(installed)}"
+                )
+            metadata["resolved_model"] = requested_model
+            return requested_model, metadata
 
         if not installed:
-            return self.default_model
+            metadata["resolved_model"] = self.default_model
+            return self.default_model, metadata
         if self.default_model in installed:
-            return self.default_model
+            metadata["resolved_model"] = self.default_model
+            return self.default_model, metadata
 
         preferred = self.config.get("preferred_models", [])
         for candidate in preferred:
             if candidate in installed:
-                return candidate
-        return installed[0]
+                metadata["resolved_model"] = candidate
+                metadata["fallback_used"] = True
+                return candidate, metadata
+
+        metadata["resolved_model"] = installed[0]
+        metadata["fallback_used"] = True
+        return installed[0], metadata
+
+    def _get_installed_models(self, refresh: bool = False) -> tuple[list[str], Exception | None]:
+        if self._installed_models_cache is not None and not refresh:
+            return self._installed_models_cache, None
+        try:
+            installed = self.client.list_models()
+        except Exception as exc:
+            return [], exc
+        self._installed_models_cache = installed
+        return installed, None
+
+    def _clean_batch_item(self, text: str) -> str:
+        return text.strip().strip("#").strip()

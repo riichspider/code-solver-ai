@@ -1,4 +1,4 @@
-default_model: qwen2.5-coder:7b
+default_model: qwen2.5-coder:latest
 ollama:
   base_url: http://localhost:11434/api
   timeout_seconds: 240
@@ -34,9 +34,10 @@ supported_languages:
   - go
   - rust
 preferred_models:
+  - qwen2.5-coder:latest
+  - llama3.1:8b
+  - qwen2.5-coder-4k:latest
+  - qwen2.5-coder:1.5b
   - qwen2.5-coder:7b
   - deepseek-coder-v2
   - codellama:13b
-  - llama3.2
-  - gemma2
-  - phi3

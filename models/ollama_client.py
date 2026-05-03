@@ -27,9 +27,25 @@ class OllamaClient:
         self.session = requests.Session()
 
     def list_models(self) -> list[str]:
-        response = self.session.get(f"{self.base_url}/tags", timeout=self.timeout_seconds)
-        response.raise_for_status()
-        payload = response.json()
+        try:
+            response = self.session.get(f"{self.base_url}/tags", timeout=self.timeout_seconds)
+        except requests.RequestException as exc:
+            raise OllamaError(
+                f"Falha ao listar modelos do Ollama em {self.base_url}/tags. "
+                "Verifique se o serviço está rodando."
+            ) from exc
+
+        if not response.ok:
+            detail = self._extract_error_message(response)
+            raise OllamaError(
+                f"Ollama respondeu com erro ao listar modelos ({response.status_code}). {detail}"
+            )
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise OllamaError("Ollama retornou uma lista de modelos em formato inválido.") from exc
+
         return [item["name"] for item in payload.get("models", []) if item.get("name")]
 
     def generate_text(
@@ -59,13 +75,23 @@ class OllamaClient:
                 json=payload,
                 timeout=self.timeout_seconds,
             )
-            response.raise_for_status()
-            data = response.json()
         except requests.RequestException as exc:
             raise OllamaError(
                 "Falha ao conectar com o Ollama. Verifique se o serviço está rodando em "
                 f"{self.base_url} e se o modelo foi baixado."
             ) from exc
+
+        if not response.ok:
+            detail = self._extract_error_message(response)
+            if response.status_code == 404 and "model" in detail.lower() and "not found" in detail.lower():
+                raise OllamaError(
+                    f"Modelo indisponível no Ollama: {detail}. "
+                    "Use `python main.py --list-models` para ver os modelos instalados."
+                )
+            raise OllamaError(f"Ollama respondeu com erro ({response.status_code}): {detail}")
+
+        try:
+            data = response.json()
         except ValueError as exc:
             raise OllamaError("Ollama retornou uma resposta inválida.") from exc
 
@@ -113,3 +139,14 @@ class OllamaClient:
         if not isinstance(payload, dict):
             raise OllamaError("O modelo retornou JSON em formato inesperado.")
         return payload
+
+    def _extract_error_message(self, response: requests.Response) -> str:
+        try:
+            payload = response.json()
+        except ValueError:
+            text = response.text.strip()
+            return text or "Nenhum detalhe adicional foi retornado."
+
+        if isinstance(payload, dict) and payload.get("error"):
+            return str(payload["error"])
+        return response.text.strip() or "Nenhum detalhe adicional foi retornado."

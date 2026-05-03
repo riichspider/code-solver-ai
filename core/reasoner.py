@@ -6,7 +6,7 @@ from utils.prompts import build_reasoning_user_prompt, reasoning_system_prompt
 
 
 class ProblemReasoner:
-    def __init__(self, client) -> None:
+    def __init__(self, client: Any) -> None:
         self.client = client
 
     def analyze(

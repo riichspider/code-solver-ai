@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from core.solver import CodeSolver, SolveRequest
 
 
@@ -112,3 +114,17 @@ def test_solver_falls_back_to_installed_model_when_default_is_missing(tmp_path):
 
     assert result.model == "fake-model"
     assert fake_client.list_models_calls >= 1
+
+
+def test_solver_rejects_explicit_missing_model_when_list_is_available(tmp_path):
+    fake_client = FakeOllamaClient()
+    solver = CodeSolver(base_dir=tmp_path, config=build_config(), client=fake_client)
+
+    with pytest.raises(ValueError, match="não está instalado"):
+        solver.solve(
+            SolveRequest(
+                problem="Create an add function in Python",
+                language="python",
+                model="missing-model",
+            )
+        )

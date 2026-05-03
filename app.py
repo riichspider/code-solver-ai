@@ -22,6 +22,15 @@ def uploaded_file_to_context(uploaded_file) -> ContextItem:
     )
 
 
+def render_exception(exc: Exception) -> None:
+    st.error("Não foi possível concluir a execução.")
+    st.caption(
+        "Verifique se o Ollama está ativo, se o modelo existe e se o prompt tem contexto suficiente."
+    )
+    with st.expander("Detalhes técnicos"):
+        st.code(str(exc))
+
+
 def render_single_result(result) -> None:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Classificação", result.classification)
@@ -168,7 +177,7 @@ def main() -> None:
                 solver.export_result(result, BASE_DIR / solver.export_directory)
             render_single_result(result)
         except Exception as exc:
-            st.error(str(exc))
+            render_exception(exc)
 
 
 if __name__ == "__main__":

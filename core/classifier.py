@@ -9,7 +9,7 @@ ALLOWED_CLASSIFICATIONS = {"bug", "enhancement", "optimization", "refactor", "qu
 
 
 class ProblemClassifier:
-    def __init__(self, client) -> None:
+    def __init__(self, client: Any) -> None:
         self.client = client
 
     def classify(

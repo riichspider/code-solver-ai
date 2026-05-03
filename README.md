@@ -62,12 +62,13 @@ pip install -e .
 Exemplos:
 
 ```bash
-ollama pull qwen2.5-coder:7b
+ollama pull qwen2.5-coder:latest
 ollama pull codellama:13b
 ollama pull deepseek-coder-v2
 ```
 
 O `config.yaml` já vem apontando para `http://localhost:11434/api`.
+Se o `default_model` não estiver instalado, o projeto tenta automaticamente usar o primeiro modelo compatível encontrado no Ollama.
 
 ## Uso via CLI
 
@@ -92,7 +93,7 @@ python main.py "Corrija o bug" --context-file examples/context_example.py
 Modo profundo:
 
 ```bash
-python main.py "Otimize este algoritmo" --mode deep --model qwen2.5-coder:7b
+python main.py "Otimize este algoritmo" --mode deep --model qwen2.5-coder:latest
 ```
 
 Modo batch:
@@ -104,7 +105,7 @@ python main.py --batch-file examples/problems.md --export-dir exports
 Comparação de modelos:
 
 ```bash
-python main.py "Refatore esta função" --compare-models qwen2.5-coder:7b codellama:13b
+python main.py "Refatore esta função" --compare-models qwen2.5-coder:latest codellama:13b
 ```
 
 Listar modelos disponíveis no Ollama:
@@ -159,12 +160,12 @@ Os arquivos são salvos em `exports/` por padrão.
 
 ## Modelos recomendados
 
-- `qwen2.5-coder:7b`
+- `qwen2.5-coder:latest`
+- `llama3.1:8b`
+- `qwen2.5-coder-4k:latest`
+- `qwen2.5-coder:1.5b`
 - `deepseek-coder-v2`
 - `codellama:13b`
-- `llama3.2`
-- `gemma2`
-- `phi3`
 
 ## Testes
 
