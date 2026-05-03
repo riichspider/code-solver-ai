@@ -1,5 +1,4 @@
 from core.coder import CodeGenerator, LANGUAGE_DEFAULTS
-from tests.test_helpers import create_mock_solution_result
 
 
 class MultiLanguageClient:
