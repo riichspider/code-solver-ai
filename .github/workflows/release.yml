@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v
+        
+    - name: Extract version from tag
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+    - name: Read CHANGELOG
+      id: changelog
+      run: |
+        # Extract content for the current version from CHANGELOG.md
+        if [ -f CHANGELOG.md ]; then
+          # Find the version section and extract content until next version
+          VERSION_LINE="## [${{ steps.version.outputs.VERSION }}]"
+          if grep -q "$VERSION_LINE" CHANGELOG.md; then
+            # Extract content from version section until next ## section
+            awk "/^$VERSION_LINE$/,/^## /" CHANGELOG.md | head -n -1 > release_notes.md
+          else
+            echo "# Release ${{ steps.version.outputs.VERSION }}" > release_notes.md
+            echo "No changelog entry found for this version." >> release_notes.md
+          fi
+        else
+          echo "# Release ${{ steps.version.outputs.VERSION }}" > release_notes.md
+          echo "No CHANGELOG.md file found." >> release_notes.md
+        fi
+        
+        # Read the release notes
+        RELEASE_NOTES=$(cat release_notes.md)
+        echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+        echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: Release ${{ steps.version.outputs.VERSION }}
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        body: ${{ steps.changelog.outputs.release_notes }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        files: |
+          LICENSE
+          README.md
+          CHANGELOG.md
+          CONTRIBUTING.md
+          SECURITY.md
+          config.yaml
+          requirements.txt
+          pyproject.toml
+          main.py
+          app.py
+          core/
+          models/
+          utils/
+          
+    - name: Upload source code as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: code-solver-ai-${{ steps.version.outputs.VERSION }}-source
+        path: |
+          .
+          !.git/
+          !.venv/
+          !__pycache__/
+          !*.pyc
+          !.pytest_cache/
+          !db/
+          !exports/
+        retention-days: 30
+        
+    - name: Create source archive
+      run: |
+        tar -czf code-solver-ai-${{ steps.version.outputs.VERSION }}.tar.gz \
+          --exclude='.git' \
+          --exclude='.venv' \
+          --exclude='__pycache__' \
+          --exclude='*.pyc' \
+          --exclude='.pytest_cache' \
+          --exclude='db' \
+          --exclude='exports' \
+          .
+          
+    - name: Upload source archive to release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: code-solver-ai-${{ steps.version.outputs.VERSION }}.tar.gz
