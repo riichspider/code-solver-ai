@@ -24,7 +24,7 @@ Tudo roda offline com modelos locais via Ollama.
 ## Estrutura
 
 ```text
-code-solver-ai/
+.
 ├── main.py
 ├── app.py
 ├── core/
@@ -41,7 +41,6 @@ code-solver-ai/
 ## Instalação
 
 ```bash
-cd code-solver-ai
 python -m venv .venv
 source .venv/bin/activate  # Linux/macOS
 .venv\Scripts\activate     # Windows PowerShell
