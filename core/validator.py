@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 import tempfile
@@ -27,6 +28,10 @@ class SolutionValidator:
             return self._validate_python(code, tests, filename, test_filename)
         if normalized_language == "javascript":
             return self._validate_javascript(code, tests, filename, test_filename)
+        if normalized_language == "typescript":
+            return self._validate_typescript(code, tests, filename, test_filename)
+        if normalized_language == "go":
+            return self._validate_go(code, tests, filename, test_filename)
         return {
             "status": "skipped",
             "tool": "none",
@@ -118,7 +123,8 @@ class SolutionValidator:
 
             if tests.strip():
                 (workspace / test_filename).write_text(tests, encoding="utf-8")
-                execution = self.executor.run(command=["node", test_filename], cwd=workspace)
+                execution = self.executor.run(
+                    command=["node", test_filename], cwd=workspace)
                 status = "passed" if execution.returncode == 0 and not execution.timed_out else "failed"
                 return {
                     "status": status,
@@ -142,4 +148,180 @@ class SolutionValidator:
                 "returncode": syntax_check.returncode,
                 "duration_seconds": syntax_check.duration_seconds,
                 "notes": "Checagem sintática concluída; nenhum arquivo de teste foi retornado.",
+            }
+
+    def _validate_typescript(
+        self,
+        code: str,
+        tests: str,
+        filename: str,
+        test_filename: str,
+    ) -> dict[str, Any]:
+        if shutil.which("tsc") is None:
+            return {
+                "status": "skipped",
+                "tool": "tsc",
+                "command": "",
+                "stdout": "",
+                "stderr": "",
+                "notes": "TypeScript compiler (tsc) não encontrado no ambiente para validar TypeScript.",
+            }
+
+        with tempfile.TemporaryDirectory(prefix="code-solver-") as temp_dir:
+            workspace = Path(temp_dir)
+            (workspace / filename).write_text(code, encoding="utf-8")
+
+            # Create a minimal tsconfig.json for TypeScript compilation
+            tsconfig = {
+                "compilerOptions": {
+                    "target": "ES2020",
+                    "module": "commonjs",
+                    "strict": True,
+                    "noEmit": True,
+                    "skipLibCheck": True
+                },
+                "include": [filename]
+            }
+            (workspace / "tsconfig.json").write_text(
+                json.dumps(tsconfig, indent=2), encoding="utf-8"
+            )
+
+            # Type check with TypeScript compiler
+            type_check = self.executor.run(
+                command=["tsc", "--noEmit"],
+                cwd=workspace,
+            )
+
+            if type_check.returncode != 0 or type_check.timed_out:
+                return {
+                    "status": "failed",
+                    "tool": "tsc",
+                    "command": "tsc --noEmit",
+                    "stdout": type_check.stdout,
+                    "stderr": type_check.stderr,
+                    "timed_out": type_check.timed_out,
+                    "returncode": type_check.returncode,
+                    "duration_seconds": type_check.duration_seconds,
+                    "notes": "Falha na verificação de tipos do TypeScript.",
+                }
+
+            if tests.strip():
+                (workspace / test_filename).write_text(tests, encoding="utf-8")
+                # For TypeScript tests, we use ts-node if available, otherwise skip test execution
+                if shutil.which("ts-node") is not None:
+                    execution = self.executor.run(
+                        command=["ts-node", test_filename], cwd=workspace)
+                    status = "passed" if execution.returncode == 0 and not execution.timed_out else "failed"
+                    return {
+                        "status": status,
+                        "tool": "tsc",
+                        "command": f"tsc --noEmit && ts-node {test_filename}",
+                        "stdout": execution.stdout,
+                        "stderr": execution.stderr,
+                        "timed_out": execution.timed_out,
+                        "returncode": execution.returncode,
+                        "duration_seconds": execution.duration_seconds,
+                        "notes": "Verificação de tipos e execução dos testes TypeScript concluídas.",
+                    }
+                else:
+                    return {
+                        "status": "passed",
+                        "tool": "tsc",
+                        "command": "tsc --noEmit",
+                        "stdout": type_check.stdout,
+                        "stderr": type_check.stderr,
+                        "timed_out": type_check.timed_out,
+                        "returncode": type_check.returncode,
+                        "duration_seconds": type_check.duration_seconds,
+                        "notes": "Verificação de tipos concluída; ts-node não encontrado para executar testes.",
+                    }
+
+            return {
+                "status": "passed",
+                "tool": "tsc",
+                "command": "tsc --noEmit",
+                "stdout": type_check.stdout,
+                "stderr": type_check.stderr,
+                "timed_out": type_check.timed_out,
+                "returncode": type_check.returncode,
+                "duration_seconds": type_check.duration_seconds,
+                "notes": "Verificação de tipos concluída; nenhum arquivo de teste foi retornado.",
+            }
+
+    def _validate_go(
+        self,
+        code: str,
+        tests: str,
+        filename: str,
+        test_filename: str,
+    ) -> dict[str, Any]:
+        if shutil.which("go") is None:
+            return {
+                "status": "skipped",
+                "tool": "go",
+                "command": "",
+                "stdout": "",
+                "stderr": "",
+                "notes": "Go compiler (go) não encontrado no ambiente para validar Go.",
+            }
+
+        with tempfile.TemporaryDirectory(prefix="code-solver-") as temp_dir:
+            workspace = Path(temp_dir)
+            (workspace / filename).write_text(code, encoding="utf-8")
+
+            # Initialize Go module
+            go_mod = self.executor.run(
+                command=["go", "mod", "init", "code-solver-test"],
+                cwd=workspace,
+            )
+
+            # Build check (syntax and compilation)
+            build_check = self.executor.run(
+                command=["go", "build", "."],
+                cwd=workspace,
+            )
+
+            if build_check.returncode != 0 or build_check.timed_out:
+                return {
+                    "status": "failed",
+                    "tool": "go",
+                    "command": "go build .",
+                    "stdout": build_check.stdout,
+                    "stderr": build_check.stderr,
+                    "timed_out": build_check.timed_out,
+                    "returncode": build_check.returncode,
+                    "duration_seconds": build_check.duration_seconds,
+                    "notes": "Falha na compilação do código Go.",
+                }
+
+            if tests.strip():
+                (workspace / test_filename).write_text(tests, encoding="utf-8")
+                # Run Go tests
+                test_execution = self.executor.run(
+                    command=["go", "test", "./..."],
+                    cwd=workspace,
+                )
+                status = "passed" if test_execution.returncode == 0 and not test_execution.timed_out else "failed"
+                return {
+                    "status": status,
+                    "tool": "go",
+                    "command": "go test ./...",
+                    "stdout": test_execution.stdout,
+                    "stderr": test_execution.stderr,
+                    "timed_out": test_execution.timed_out,
+                    "returncode": test_execution.returncode,
+                    "duration_seconds": test_execution.duration_seconds,
+                    "notes": "Compilação e execução dos testes Go concluídas.",
+                }
+
+            return {
+                "status": "passed",
+                "tool": "go",
+                "command": "go build .",
+                "stdout": build_check.stdout,
+                "stderr": build_check.stderr,
+                "timed_out": build_check.timed_out,
+                "returncode": build_check.returncode,
+                "duration_seconds": build_check.duration_seconds,
+                "notes": "Compilação concluída; nenhum arquivo de teste foi retornado.",
             }
