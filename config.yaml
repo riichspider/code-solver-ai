@@ -39,6 +39,5 @@ preferred_models:
   - llama3.1:8b
   - qwen2.5-coder-4k:latest
   - qwen2.5-coder:1.5b
-  - qwen2.5-coder:7b
   - deepseek-coder-v2
   - codellama:13b
