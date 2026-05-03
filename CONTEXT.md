@@ -2,7 +2,6 @@
 
 ## Estado atual
 - 14 testes passando
-- Health Score Revibe: ~75 (melhorado de 67)
 - Python 3.10, Ollama local, Streamlit + CLI
 
 ## O que já foi feito
@@ -11,11 +10,9 @@
 - Error handling consistente
 - solve_batch centralizado em core/solver.py
 - Test helpers em tests/test_helpers.py
-
-## Problemas conhecidos
-- config.yaml aponta para modelo não instalado (qwen2.5-coder:7b)
-- Similaridade do histórico escala mal acima de 500 entradas
+- Cache TTL configurável via config.yaml (padrão 24h)
+- Similaridade otimizada com Jaccard pre-filtering
 
 ## Próximos passos pendentes
 - Validar testes para TypeScript, Java, Go, Rust
-- TTL no cache
+- Atualizar README com exemplos de uso
