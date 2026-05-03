@@ -137,5 +137,3 @@ class CodeGenerator:
         if isinstance(notes, str):
             notes = [notes]
         notes = [str(item).strip() for item in notes if str(item).strip()]
-
-    ```(?:[\w.+-]+)?\s*\n?(.*?)

@@ -71,29 +71,29 @@ class OllamaClient:
 
         try:
             response = self.session.post(
-                f"{self.base_url}/chat",
-                json=payload,
-                timeout=self.timeout_seconds,
-            )
-        except requests.RequestException as exc:
+            f"{self.base_url}/chat",
+            json=payload,
+            timeout=self.timeout_seconds,
+        )
+    except requests.RequestException as exc:
+        raise OllamaError(
+            "Falha ao conectar com o Ollama. Verifique se o serviço está rodando em "
+            f"{self.base_url} e se o modelo foi baixado."
+        ) from exc
+
+    if not response.ok:
+        detail = self._extract_error_message(response)
+        if response.status_code == 404 and "model" in detail.lower() and "not found" in detail.lower():
             raise OllamaError(
-                "Falha ao conectar com o Ollama. Verifique se o serviço está rodando em "
-                f"{self.base_url} e se o modelo foi baixado."
-            ) from exc
+                f"Modelo indisponível no Ollama: {detail}. "
+                "Use `python main.py --list-models` para ver os modelos instalados."
+            )
+        raise OllamaError(f"Ollama respondeu com erro ({response.status_code}): {detail}")
 
-        if not response.ok:
-            detail = self._extract_error_message(response)
-            if response.status_code == 404 and "model" in detail.lower() and "not found" in detail.lower():
-                raise OllamaError(
-                    f"Modelo indisponível no Ollama: {detail}. "
-                    "Use `python main.py --list-models` para ver os modelos instalados."
-                )
-            raise OllamaError(f"Ollama respondeu com erro ({response.status_code}): {detail}")
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise OllamaError("Ollama retornou uma resposta inválida.") from exc
 
-        try:
-            data = response.json()
-        except ValueError as exc:
-            raise OllamaError("Ollama retornou uma resposta inválida.") from exc
-
-        if data.get("error"):
-    ```") and cleaned.endswith("
+    if data.get("error"):
+        raise OllamaError(f"Ollama retornou um erro: {data.get('error')}")
