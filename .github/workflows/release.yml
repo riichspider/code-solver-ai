@@ -13,10 +13,10 @@ jobs:
       
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
       
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@82c7e731883ebc722b78c0c0a737c0d6176b718f
       with:
         python-version: "3.10"
         
@@ -59,7 +59,7 @@ jobs:
         echo "EOF" >> $GITHUB_OUTPUT
         
     - name: Create Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@6927012c9b65c7e9767f5b4e6b66f66e4e41785e
       with:
         name: Release ${{ steps.version.outputs.VERSION }}
         tag_name: v${{ steps.version.outputs.VERSION }}
@@ -83,7 +83,7 @@ jobs:
           utils/
           
     - name: Upload source code as artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@65462800fd760344b1a7ed4a2cf5345e59023e42
       with:
         name: code-solver-ai-${{ steps.version.outputs.VERSION }}-source
         path: |
@@ -110,6 +110,6 @@ jobs:
           .
           
     - name: Upload source archive to release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@6927012c9b65c7e9767f5b4e6b66f66e4e41785e
       with:
         files: code-solver-ai-${{ steps.version.outputs.VERSION }}.tar.gz
