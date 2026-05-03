@@ -4,7 +4,7 @@ import json
 import sqlite3
 import warnings
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from difflib import SequenceMatcher
 from hashlib import sha256
 from pathlib import Path
@@ -16,9 +16,10 @@ def normalize_text(text: str) -> str:
 
 
 class SolverCache:
-    def __init__(self, directory: Path) -> None:
+    def __init__(self, directory: Path, ttl_hours: int = 24) -> None:
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True)
+        self.ttl = timedelta(hours=ttl_hours)
 
     def build_key(
         self,
@@ -45,14 +46,56 @@ class SolverCache:
         path = self._path_for_key(key)
         if not path.exists():
             return None
-        return json.loads(path.read_text(encoding="utf-8"))
+
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+
+            # Check if entry has TTL information
+            if "cached_at" in data:
+                cached_at = datetime.fromisoformat(data["cached_at"])
+                if datetime.now(timezone.utc) - cached_at > self.ttl:
+                    # Entry expired, remove it and return None
+                    path.unlink(missing_ok=True)
+                    return None
+
+            # Return the actual payload (without metadata)
+            return data.get("payload", data)
+        except (json.JSONDecodeError, ValueError, KeyError):
+            # Corrupted cache file, remove it
+            path.unlink(missing_ok=True)
+            return None
 
     def set(self, key: str, payload: dict[str, Any]) -> None:
         path = self._path_for_key(key)
+        cache_data = {
+            "payload": payload,
+            "cached_at": datetime.now(timezone.utc).isoformat(),
+            "ttl_hours": self.ttl.total_seconds() / 3600,
+        }
         path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
+            json.dumps(cache_data, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+
+    def cleanup_expired(self) -> int:
+        """Remove expired cache entries and return count of removed items."""
+        removed_count = 0
+        current_time = datetime.now(timezone.utc)
+
+        for cache_file in self.directory.glob("*.json"):
+            try:
+                data = json.loads(cache_file.read_text(encoding="utf-8"))
+                if "cached_at" in data:
+                    cached_at = datetime.fromisoformat(data["cached_at"])
+                    if current_time - cached_at > self.ttl:
+                        cache_file.unlink()
+                        removed_count += 1
+            except (json.JSONDecodeError, ValueError, KeyError):
+                # Remove corrupted cache files
+                cache_file.unlink()
+                removed_count += 1
+
+        return removed_count
 
 
 @dataclass
@@ -172,6 +215,9 @@ class HistoryStore:
         candidate_pool: int = 50,
     ) -> list[dict[str, Any]]:
         normalized_problem = normalize_text(problem)
+        problem_words = set(normalized_problem.split())
+
+        # Optimized query with language filter and recent items limit
         query = """
             SELECT problem_text, classification, language, markdown, labels_json, normalized_problem
             FROM solutions
@@ -186,22 +232,43 @@ class HistoryStore:
         scored: list[SimilarSolution] = []
         with self._connect() as connection:
             rows = connection.execute(query, params).fetchall()
+
+        # Early exit if no rows
+        if not rows:
+            return []
+
+        # Pre-filter with faster Jaccard similarity first, then compute expensive SequenceMatcher only on promising candidates
+        promising_candidates = []
         for row in rows:
+            row_words = set(row["normalized_problem"].split())
+
+            # Fast Jaccard similarity filter
+            shared_terms = problem_words & row_words
+            if not shared_terms:
+                continue  # No shared words, skip expensive comparison
+
+            jaccard = len(shared_terms) / \
+                max(1, len(problem_words | row_words))
+            if jaccard < 0.1:  # Low threshold for initial filter
+                continue
+
+            promising_candidates.append((row, jaccard))
+
+        # Sort by Jaccard and compute expensive SequenceMatcher only on top candidates
+        promising_candidates.sort(key=lambda x: x[1], reverse=True)
+
+        # Compute full similarity score only on top 20 candidates
+        for row, jaccard in promising_candidates[:20]:
             sequence_score = SequenceMatcher(
                 None,
                 normalized_problem,
                 row["normalized_problem"],
             ).ratio()
-            shared_terms = set(normalized_problem.split()) & set(
-                row["normalized_problem"].split())
-            jaccard = len(shared_terms) / max(
-                1,
-                len(set(normalized_problem.split()) | set(
-                    row["normalized_problem"].split())),
-            )
             score = (sequence_score + jaccard) / 2
+
             if score < 0.18:
                 continue
+
             markdown_text = row["markdown"]
             # TRUNCATION_LIMIT: 900 chars for solution excerpt
             solution_excerpt = markdown_text[:900]
@@ -222,6 +289,7 @@ class HistoryStore:
                     labels=json.loads(row["labels_json"]),
                 )
             )
+
         scored.sort(key=lambda item: item.score, reverse=True)
         return [
             {

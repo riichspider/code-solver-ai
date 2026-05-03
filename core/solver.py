@@ -102,8 +102,9 @@ class CodeSolver:
         self.cache_enabled = bool(config.get("cache", {}).get("enabled", True))
         self.similar_results = int(config.get(
             "history", {}).get("similar_results", 3))
+        cache_ttl_hours = int(config.get("cache", {}).get("ttl_hours", 24))
 
-        self.cache = SolverCache(cache_directory)
+        self.cache = SolverCache(cache_directory, ttl_hours=cache_ttl_hours)
         self.history = HistoryStore(history_path)
         self.classifier = ProblemClassifier(self.client)
         self.reasoner = ProblemReasoner(self.client)
