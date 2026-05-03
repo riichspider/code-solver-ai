@@ -1,5 +1,10 @@
 # Code Solver AI
 
+![CI](https://github.com/riichspider/code-solver-ai/workflows/CI/badge.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
+![Languages](https://img.shields.io/badge/languages-6-green.svg)
+
 Uma ferramenta de IA local que analisa problemas de programação e gera soluções completas com:
 
 - ✅ **Classificação automática** do problema (bug, enhancement, feature, etc.)
