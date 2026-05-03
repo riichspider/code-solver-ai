@@ -103,6 +103,7 @@ class CodeSolver:
         self.reasoner = ProblemReasoner(self.client)
         self.coder = CodeGenerator(self.client)
         self.validator = SolutionValidator()
+        self._installed_models_cache: list[str] | None = None
 
     @classmethod
     def from_config(cls, config_path: Path) -> "CodeSolver":
@@ -118,8 +119,8 @@ class CodeSolver:
             discovered = self.client.list_models()
         except Exception:
             return configured
-        merged = list(dict.fromkeys(discovered + configured))
-        return merged
+        self._installed_models_cache = discovered
+        return discovered or configured
 
     def solve(self, request: SolveRequest) -> SolveResult:
         problem = request.problem.strip()
@@ -130,7 +131,7 @@ class CodeSolver:
         if language not in self.supported_languages:
             language = "python"
         mode = request.mode if request.mode in {"fast", "deep"} else "fast"
-        model = request.model or self.default_model
+        model = self._resolve_model(request.model)
 
         context_text = self._render_context_items(request.context_items)
         cache_key = self.cache.build_key(problem, language, model, mode, context_text)
@@ -221,6 +222,8 @@ class CodeSolver:
             "repair_applied": repair_applied,
             "context_files": [item.name for item in request.context_items],
             "similar_context_count": len(similar_context),
+            "default_model_requested": request.model is None,
+            "configured_default_model": self.default_model,
         }
 
         result = SolveResult(
@@ -341,3 +344,26 @@ class CodeSolver:
     def _slugify(self, text: str) -> str:
         slug = re.sub(r"[^a-zA-Z0-9]+", "-", text.lower()).strip("-")
         return slug[:50] or "solution"
+
+    def _resolve_model(self, requested_model: str | None) -> str:
+        if requested_model:
+            return requested_model
+
+        installed = self._installed_models_cache
+        if installed is None:
+            try:
+                installed = self.client.list_models()
+            except Exception:
+                installed = []
+            self._installed_models_cache = installed
+
+        if not installed:
+            return self.default_model
+        if self.default_model in installed:
+            return self.default_model
+
+        preferred = self.config.get("preferred_models", [])
+        for candidate in preferred:
+            if candidate in installed:
+                return candidate
+        return installed[0]

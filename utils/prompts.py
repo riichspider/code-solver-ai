@@ -132,6 +132,7 @@ Rules:
 - Prefer standard library when possible.
 - Tests must be runnable locally and cover the main flow plus edge cases.
 - For Python, prefer unittest and code that can be imported from the generated file.
+- For JavaScript, do not use chai, jest, mocha, vitest, or any third-party package; use only built-in `assert` and optionally `node:test`.
 - Never wrap code in markdown fences.
 
 Few-shot quality example:
@@ -195,6 +196,7 @@ You are the repair stage of an offline code-solving pipeline.
 Target language: {language}.
 Return valid JSON only with the same schema as the code-generation stage.
 Use the validation feedback to fix the code or tests with the smallest reliable change.
+If the validator reports missing packages or modules, rewrite the solution to avoid external dependencies.
 Do not add markdown fences.
 """.strip()
 

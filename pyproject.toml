@@ -21,3 +21,6 @@ code-solver = "main:main"
 [tool.setuptools]
 packages = ["core", "models", "utils"]
 py-modules = ["main", "app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

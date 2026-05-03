@@ -6,6 +6,7 @@ from core.solver import CodeSolver, SolveRequest
 class FakeOllamaClient:
     def __init__(self):
         self.calls = 0
+        self.list_models_calls = 0
         self.responses = [
             {
                 "understanding": "Create a simple add helper with tests.",
@@ -41,6 +42,7 @@ class FakeOllamaClient:
         ]
 
     def list_models(self):
+        self.list_models_calls += 1
         return ["fake-model"]
 
     def generate_json(self, **kwargs):
@@ -97,3 +99,16 @@ def test_solver_uses_cache_on_second_call(tmp_path):
     assert first.cached is False
     assert second.cached is True
     assert fake_client.calls == 3
+
+
+def test_solver_falls_back_to_installed_model_when_default_is_missing(tmp_path):
+    fake_client = FakeOllamaClient()
+    config = build_config()
+    config["default_model"] = "missing-model"
+    config["preferred_models"] = ["missing-model", "fake-model"]
+    solver = CodeSolver(base_dir=tmp_path, config=config, client=fake_client)
+
+    result = solver.solve(SolveRequest(problem="Create an add function in Python", language="python"))
+
+    assert result.model == "fake-model"
+    assert fake_client.list_models_calls >= 1
