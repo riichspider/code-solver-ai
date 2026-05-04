@@ -32,6 +32,10 @@
 - Templates de Issue e PR
 - CHANGELOG.md e CONTRIBUTING.md
 - Badges no README
+- Sanitização de inputs contra prompt injection
+- Logging estruturado em core/ (utils/logger.py)
+- Labels do GitHub configurados
+- .editorconfig adicionado
 
 ## Arquitetura
 - core/solver.py — orquestrador principal
@@ -52,3 +56,5 @@
 - LRU eviction no cache (futuro)
 - Plugin para VS Code (futuro)
 - Suite de benchmarking (futuro)
+- Docker para isolamento de processos (futuro)
+- Traduzir documentação para inglês (futuro)
