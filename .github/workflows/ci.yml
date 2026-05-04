@@ -47,3 +47,22 @@ jobs:
         path: |
           test-results/
           **/test-results.xml
+
+      # 🔍 SonarCloud Scan
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      # 🧹 MegaLinter (auto-fix)
+      - name: MegaLinter
+        uses: oxsecurity/megalinter@v7
+        env:
+          APPLY_FIXES: all
+
+      # 🔁 Auto commit das correções
+      - name: Auto Commit Fixes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: auto fixes applied"
