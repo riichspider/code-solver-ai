@@ -1,8 +1,78 @@
 from __future__ import annotations
 
 import json
+import re
 import warnings
 from typing import Any
+
+
+def sanitize_input(text: str) -> str:
+    """
+    Sanitize input text to prevent prompt injection attacks.
+
+    Removes or escapes suspicious patterns including:
+    - "ignore previous instructions" variants
+    - "you are now" / "act as" role-playing attempts
+    - Simulated system blocks like [SYSTEM]
+    - Control characters and null bytes
+
+    Args:
+        text: Input text to sanitize
+
+    Returns:
+        Sanitized text safe for LLM consumption
+    """
+    if not text:
+        return text
+
+    # Remove null bytes and control characters (except newlines and tabs)
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
+
+    # Escape or remove prompt injection patterns
+    patterns_to_remove = [
+        # Ignore previous instructions patterns
+        r'(?i)(ignore\s+(?:previous|all|the)\s+instructions?)',
+        r'(?i)(forget\s+(?:everything|all|previous|the)\s+(?:above|instructions)?)',
+        r'(?i)(disregard\s+(?:previous|all|the)\s+instructions?)',
+
+        # Role-playing attempts
+        r'(?i)(you\s+are\s+now\s+(?:a|an))',
+        r'(?i)(act\s+as\s+(?:a|an))',
+        r'(?i)(pretend\s+to\s+be)',
+        r'(?i)(roleplay\s+as)',
+
+        # System block attempts
+        r'\[SYSTEM\]',
+        r'\[ADMIN\]',
+        r'\[DEVELOPER\]',
+        r'\[MODATOR\]',
+        r'\[AI\]',
+
+        # Instruction override attempts
+        r'(?i)(override\s+(?:previous|all|the)\s+instructions?)',
+        r'(?i)(new\s+(?:instructions|rules|directives))',
+        r'(?i)(from\s+now\s+on)',
+
+        # Jailbreak attempts
+        r'(?i)(jailbreak)',
+        r'(?i)(dan\s+\d+)',
+        r'(?i)(developer\s+mode)',
+
+        # Template injection
+        r'\{\{.*?\}\}',
+        r'\${.*?}',
+    ]
+
+    for pattern in patterns_to_remove:
+        text = re.sub(pattern, '[REDACTED]', text)
+
+    # Limit consecutive characters to prevent DoS
+    text = re.sub(r'(.)\1{50,}', r'\1\1\1\1\1', text)
+
+    # Trim whitespace
+    text = text.strip()
+
+    return text
 
 
 def _serialize_similar_context(similar_context: list[dict[str, Any]]) -> str:
@@ -50,6 +120,10 @@ def build_classification_user_prompt(
     context_text: str,
     similar_context: list[dict[str, Any]],
 ) -> str:
+    # Sanitize inputs to prevent prompt injection
+    safe_problem = sanitize_input(problem)
+    safe_context = sanitize_input(context_text)
+
     return f"""
 Return a JSON object with this schema:
 {{
@@ -64,10 +138,10 @@ Return a JSON object with this schema:
 Language hint: {language_hint or "unknown"}
 
 Problem:
-{problem}
+{safe_problem}
 
 Additional context:
-{context_text or "None"}
+{safe_context or "None"}
 
 Relevant memory from previous solutions:
 {_serialize_similar_context(similar_context)}
@@ -93,6 +167,11 @@ def build_reasoning_user_prompt(
     context_text: str,
     similar_context: list[dict[str, Any]],
 ) -> str:
+    # Sanitize inputs to prevent prompt injection
+    safe_problem = sanitize_input(problem)
+    safe_context = sanitize_input(context_text)
+    safe_understanding = sanitize_input(understanding)
+
     return f"""
 Return a JSON object with this schema:
 {{
@@ -107,13 +186,13 @@ Problem classification: {classification}
 Complexity: {complexity}/10
 Target language: {language}
 Current understanding:
-{understanding}
+{safe_understanding}
 
 Problem:
-{problem}
+{safe_problem}
 
 Additional context:
-{context_text or "None"}
+{safe_context or "None"}
 
 Relevant memory:
 {_serialize_similar_context(similar_context)}
@@ -170,16 +249,21 @@ def build_coding_user_prompt(
     context_text: str,
     similar_context: list[dict[str, Any]],
 ) -> str:
+    # Sanitize inputs to prevent prompt injection
+    safe_problem = sanitize_input(problem)
+    safe_context = sanitize_input(context_text)
+    safe_understanding = sanitize_input(understanding)
+
     return f"""
 Generate the final solution package.
 
 Problem:
-{problem}
+{safe_problem}
 
 Classification: {classification}
 Target language: {language}
 Understanding:
-{understanding}
+{safe_understanding}
 
 Plan steps:
 {json.dumps(plan_steps, ensure_ascii=False, indent=2)}
@@ -194,7 +278,7 @@ Success criteria:
 {json.dumps(success_criteria, ensure_ascii=False, indent=2)}
 
 Additional context:
-{context_text or "None"}
+{safe_context or "None"}
 
 Relevant memory:
 {_serialize_similar_context(similar_context)}
@@ -218,11 +302,14 @@ def build_repair_user_prompt(
     previous_solution: dict[str, Any],
     validation: dict[str, Any],
 ) -> str:
+    # Sanitize inputs to prevent prompt injection
+    safe_problem = sanitize_input(problem)
+
     return f"""
 Repair the generated solution using the validator feedback.
 
 Problem:
-{problem}
+{safe_problem}
 
 Target language:
 {language}
