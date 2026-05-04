@@ -8,12 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from utils.executor import SandboxExecutor
+from utils.logger import get_logger, log_error
 
 
 class SolutionValidator:
     def __init__(self, timeout_seconds: int = 20) -> None:
         self.timeout_seconds = timeout_seconds
         self.executor = SandboxExecutor(timeout_seconds=timeout_seconds)
+        self.logger = get_logger("validator")
 
     def validate(
         self,
@@ -72,6 +74,25 @@ class SolutionValidator:
 
             result = self.executor.run(command=command, cwd=workspace)
             status = "passed" if result.returncode == 0 and not result.timed_out else "failed"
+
+            # Log validation failures
+            if status == "failed":
+                log_error(
+                    self.logger,
+                    Exception(
+                        f"Python validation failed with return code {result.returncode}"),
+                    context="_validate_python",
+                    details={
+                        "filename": filename,
+                        "test_filename": test_filename,
+                        "returncode": result.returncode,
+                        "timed_out": result.timed_out,
+                        "duration_seconds": result.duration_seconds,
+                        "command": " ".join(command),
+                        "stderr_sample": result.stderr[:200] + "..." if len(result.stderr) > 200 else result.stderr
+                    }
+                )
+
             return {
                 "status": status,
                 "tool": tool,

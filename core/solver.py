@@ -13,6 +13,7 @@ from core.coder import CodeGenerationError, CodeGenerator
 from core.reasoner import ProblemReasoner
 from core.validator import SolutionValidator
 from models.ollama_client import OllamaClient
+from utils.logger import get_logger, log_pipeline_stage, log_error
 from utils.markdown import render_solution_markdown
 
 
@@ -111,6 +112,7 @@ class CodeSolver:
         self.coder = CodeGenerator(self.client)
         self.validator = SolutionValidator()
         self._installed_models_cache: list[str] | None = None
+        self.logger = get_logger("code_solver")
 
     @classmethod
     def from_config(cls, config_path: Path) -> "CodeSolver":
@@ -139,12 +141,33 @@ class CodeSolver:
         mode = request.mode if request.mode in {"fast", "deep"} else "fast"
         model, model_resolution = self._resolve_model(request.model)
 
+        # Log pipeline start
+        log_pipeline_stage(
+            self.logger,
+            "solve",
+            "started",
+            details={
+                "problem_length": len(problem),
+                "language": language,
+                "model": model,
+                "mode": mode,
+                "cache_enabled": request.use_cache and self.cache_enabled,
+                "context_items": len(request.context_items)
+            }
+        )
+
         context_text = self._render_context_items(request.context_items)
         cache_key = self.cache.build_key(
             problem, language, model, mode, context_text)
         if request.use_cache and self.cache_enabled:
             cached_payload = self.cache.get(cache_key)
             if cached_payload:
+                log_pipeline_stage(
+                    self.logger,
+                    "solve",
+                    "cache_hit",
+                    details={"cache_key": cache_key[:50] + "..."}
+                )
                 cached_payload["cached"] = True
                 return SolveResult.from_dict(cached_payload)
 
@@ -301,6 +324,21 @@ class CodeSolver:
         payload["history_id"] = history_id
         if request.use_cache and self.cache_enabled:
             self.cache.set(cache_key, payload)
+
+        # Log pipeline completion
+        log_pipeline_stage(
+            self.logger,
+            "solve",
+            "completed",
+            details={
+                "classification": classification["classification"],
+                "complexity": classification["complexity"],
+                "validation_status": validation.get("status"),
+                "repair_applied": repair_applied,
+                "history_id": history_id
+            }
+        )
+
         return result
 
     def solve_batch(self, problems: list[str], template: SolveRequest) -> list[SolveResult]:

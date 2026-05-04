@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from utils.logger import get_logger, log_error
 from utils.prompts import (
     build_coding_user_prompt,
     build_repair_user_prompt,
@@ -28,6 +29,7 @@ class CodeGenerationError(RuntimeError):
 class CodeGenerator:
     def __init__(self, client: Any) -> None:
         self.client = client
+        self.logger = get_logger("coder")
 
     def generate(
         self,
@@ -46,6 +48,12 @@ class CodeGenerator:
         options: dict[str, Any],
     ) -> dict[str, Any]:
         if self.client is None:
+            log_error(
+                self.logger,
+                CodeGenerationError("No client available for code generation"),
+                context="generate",
+                details={"language": language, "model": model}
+            )
             raise CodeGenerationError(
                 "Nenhum cliente de modelo local foi configurado. Inicie o Ollama e defina um modelo válido."
             )
@@ -86,11 +94,34 @@ class CodeGenerator:
                 return self._normalize_payload(payload, language)
             except Exception as exc:
                 errors.append(str(exc))
+                log_error(
+                    self.logger,
+                    exc,
+                    context="generate",
+                    details={
+                        "language": language,
+                        "model": model,
+                        "retry_attempt": len(errors),
+                        "error": str(exc)
+                    }
+                )
 
-        raise CodeGenerationError(
+        final_error = CodeGenerationError(
             "O modelo não retornou uma solução utilizável após 2 tentativas. "
             f"Último erro: {errors[-1]}"
         )
+        log_error(
+            self.logger,
+            final_error,
+            context="generate",
+            details={
+                "language": language,
+                "model": model,
+                "total_retries": len(errors),
+                "all_errors": errors
+            }
+        )
+        raise final_error
 
     def repair(
         self,
@@ -125,23 +156,29 @@ class CodeGenerator:
             language,
             ("solution.txt", "test_solution.txt"),
         )
-        filename = str(payload.get("filename", default_filename)).strip() or default_filename
-        test_filename = str(payload.get("test_filename", default_test_filename)).strip() or default_test_filename
+        filename = str(payload.get("filename", default_filename)
+                       ).strip() or default_filename
+        test_filename = str(payload.get(
+            "test_filename", default_test_filename)).strip() or default_test_filename
 
         explanation = payload.get("explanation", [])
         if isinstance(explanation, str):
             explanation = [explanation]
-        explanation = [str(item).strip() for item in explanation if str(item).strip()]
+        explanation = [str(item).strip()
+                       for item in explanation if str(item).strip()]
 
         notes = payload.get("notes", [])
         if isinstance(notes, str):
             notes = [notes]
         notes = [str(item).strip() for item in notes if str(item).strip()]
 
-        code = self._normalize_generated_block(str(payload.get("code", "")).strip())
-        tests = self._normalize_generated_block(str(payload.get("tests", "")).strip())
+        code = self._normalize_generated_block(
+            str(payload.get("code", "")).strip())
+        tests = self._normalize_generated_block(
+            str(payload.get("tests", "")).strip())
         if not code:
-            raise CodeGenerationError("O modelo não retornou código utilizável.")
+            raise CodeGenerationError(
+                "O modelo não retornou código utilizável.")
 
         return {
             "filename": filename,
@@ -165,7 +202,8 @@ class CodeGenerator:
 
     def _strip_code_fences(self, text: str) -> str:
         cleaned = text.strip()
-        fence_match = re.search(r"```(?:[\w.+-]+)?\s*\n?(.*?)```", cleaned, re.DOTALL)
+        fence_match = re.search(
+            r"```(?:[\w.+-]+)?\s*\n?(.*?)```", cleaned, re.DOTALL)
         if fence_match:
             return fence_match.group(1).strip()
 

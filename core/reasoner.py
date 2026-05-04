@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from utils.logger import get_logger, log_warning
 from utils.prompts import build_reasoning_user_prompt, reasoning_system_prompt
 
 
 class ProblemReasoner:
     def __init__(self, client: Any) -> None:
         self.client = client
+        self.logger = get_logger("reasoner")
 
     def analyze(
         self,
@@ -21,8 +23,16 @@ class ProblemReasoner:
         model: str,
         options: dict[str, Any],
     ) -> dict[str, Any]:
-        fallback = self._fallback(problem, classification, complexity, language, understanding)
+        fallback = self._fallback(
+            problem, classification, complexity, language, understanding)
         if self.client is None:
+            log_warning(
+                self.logger,
+                "No client available, using fallback reasoning",
+                context="analyze",
+                details={"classification": classification,
+                         "complexity": complexity}
+            )
             return fallback
 
         try:
@@ -40,13 +50,20 @@ class ProblemReasoner:
                 model=model,
                 options=options,
             )
-        except Exception:
+        except Exception as e:
+            log_warning(
+                self.logger,
+                f"Reasoning failed, using fallback: {str(e)}",
+                context="analyze",
+                details={"model": model, "error_type": type(e).__name__}
+            )
             return fallback
 
         plan_steps = payload.get("plan_steps") or fallback["plan_steps"]
         constraints = payload.get("constraints") or fallback["constraints"]
         risks = payload.get("risks") or fallback["risks"]
-        success_criteria = payload.get("success_criteria") or fallback["success_criteria"]
+        success_criteria = payload.get(
+            "success_criteria") or fallback["success_criteria"]
 
         return {
             "understanding": str(payload.get("understanding", understanding)).strip() or fallback["understanding"],

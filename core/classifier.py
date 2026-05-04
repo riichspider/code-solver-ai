@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from typing import Any
 
+from utils.logger import get_logger, log_warning
 from utils.prompts import build_classification_user_prompt, classification_system_prompt
 
 
-ALLOWED_CLASSIFICATIONS = {"bug", "enhancement", "optimization", "refactor", "question"}
+ALLOWED_CLASSIFICATIONS = {"bug", "enhancement",
+                           "optimization", "refactor", "question"}
 
 
 class ProblemClassifier:
     def __init__(self, client: Any) -> None:
         self.client = client
+        self.logger = get_logger("classifier")
 
     def classify(
         self,
@@ -23,6 +26,12 @@ class ProblemClassifier:
     ) -> dict[str, Any]:
         fallback = self._fallback(problem, language_hint, context_text)
         if self.client is None:
+            log_warning(
+                self.logger,
+                "No client available, using fallback classification",
+                context="classify",
+                details={"language_hint": language_hint}
+            )
             return fallback
 
         try:
@@ -37,10 +46,17 @@ class ProblemClassifier:
                 model=model,
                 options=options,
             )
-        except Exception:
+        except Exception as e:
+            log_warning(
+                self.logger,
+                f"Classification failed, using fallback: {str(e)}",
+                context="classify",
+                details={"model": model, "error_type": type(e).__name__}
+            )
             return fallback
 
-        classification = str(payload.get("classification", fallback["classification"])).strip().lower()
+        classification = str(payload.get(
+            "classification", fallback["classification"])).strip().lower()
         if classification not in ALLOWED_CLASSIFICATIONS:
             classification = fallback["classification"]
 
@@ -51,13 +67,16 @@ class ProblemClassifier:
             complexity = fallback["complexity"]
         complexity = max(1, min(10, complexity))
 
-        detected_language = str(payload.get("language", language_hint or fallback["language"])).strip().lower()
+        detected_language = str(payload.get(
+            "language", language_hint or fallback["language"])).strip().lower()
         labels = payload.get("labels") or fallback["labels"]
         if not isinstance(labels, list):
             labels = fallback["labels"]
 
-        understanding = str(payload.get("understanding", fallback["understanding"])).strip() or fallback["understanding"]
-        why = str(payload.get("why", fallback["why"])).strip() or fallback["why"]
+        understanding = str(payload.get(
+            "understanding", fallback["understanding"])).strip() or fallback["understanding"]
+        why = str(payload.get(
+            "why", fallback["why"])).strip() or fallback["why"]
 
         return {
             "classification": classification,
@@ -82,7 +101,8 @@ class ProblemClassifier:
             classification = "question"
 
         detected_language = self._detect_language(language_hint, combined)
-        complexity = min(10, max(2, len(problem.split()) // 12 + (2 if context_text else 0)))
+        complexity = min(10, max(2, len(problem.split()) //
+                         12 + (2 if context_text else 0)))
         understanding = (
             "Resolver o problema descrito, considerando o contexto disponível, entregando código "
             "executável, testes e explicação clara."
