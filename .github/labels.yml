@@ -1,0 +1,51 @@
+# Repository Labels Configuration
+# Defines standard labels for the code-solver-ai repository
+
+# Label definitions with colors and descriptions
+labels:
+  # Priority labels
+  - name: "good first issue"
+    color: "00ff00"  # Green
+    description: "Good for newcomers - ideal first contribution"
+  
+  - name: "bug"
+    color: "ff0000"  # Red
+    description: "Confirmed problems that need to be fixed"
+  
+  - name: "enhancement"
+    color: "0075ca"  # Blue
+    description: "New features and improvements"
+  
+  - name: "documentation"
+    color: "ffff00"  # Yellow
+    description: "Documentation improvements and additions"
+  
+  - name: "security"
+    color: "ff6600"  # Orange
+    description: "Security vulnerabilities and fixes"
+  
+  - name: "help wanted"
+    color: "ff69b4"  # Pink
+    description: "Community help needed for this issue"
+  
+  - name: "wontfix"
+    color: "cccccc"  # Gray
+    description: "Issues that will not be fixed"
+
+# Label categories for organization
+categories:
+  - name: "priority"
+    labels:
+      - "good first issue"
+      - "bug"
+  
+  - name: "type"
+    labels:
+      - "enhancement"
+      - "documentation"
+      - "security"
+  
+  - name: "status"
+    labels:
+      - "help wanted"
+      - "wontfix"

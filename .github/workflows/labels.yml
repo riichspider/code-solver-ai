@@ -1,0 +1,81 @@
+name: Sync Repository Labels
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  sync-labels:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read  # To read labels.yml
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@82c7e731883ebc722b78c0c0a737c0d6176b718f
+      with:
+        node-version: '20'
+    
+    - name: Install GitHub CLI
+      run: |
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-2023-10-02.tar.gz | tar xz -C /tmp
+        sudo mv /tmp/github-cli-2.30.0-linux-amd64/bin/gh /usr/local/bin/
+        sudo chmod +x /usr/local/bin/gh
+    
+    - name: Sync labels
+      run: |
+        # Read labels configuration
+        if [ -f ".github/labels.yml" ]; then
+          echo "Found labels.yml configuration"
+          
+          # Create labels using GitHub CLI
+          # Define labels with colors and descriptions
+          
+          # Priority labels
+          gh label create "good first issue" \
+            --color "00ff00" \
+            --description "Good for newcomers - ideal first contribution" \
+            --force || echo "Label 'good first issue' already exists or failed to create"
+          
+          gh label create "bug" \
+            --color "ff0000" \
+            --description "Confirmed problems that need to be fixed" \
+            --force || echo "Label 'bug' already exists or failed to create"
+          
+          gh label create "enhancement" \
+            --color "0075ca" \
+            --description "New features and improvements" \
+            --force || echo "Label 'enhancement' already exists or failed to create"
+          
+          gh label create "documentation" \
+            --color "ffff00" \
+            --description "Documentation improvements and additions" \
+            --force || echo "Label 'documentation' already exists or failed to create"
+          
+          gh label create "security" \
+            --color "ff6600" \
+            --description "Security vulnerabilities and fixes" \
+            --force || echo "Label 'security' already exists or failed to create"
+          
+          gh label create "help wanted" \
+            --color "ff69b4" \
+            --description "Community help needed for this issue" \
+            --force || echo "Label 'help wanted' already exists or failed to create"
+          
+          gh label create "wontfix" \
+            --color "cccccc" \
+            --description "Issues that will not be fixed" \
+            --force || echo "Label 'wontfix' already exists or failed to create"
+          
+          echo "Labels synchronization completed"
+        else
+          echo "No labels.yml found, skipping label synchronization"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
