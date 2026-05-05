@@ -291,7 +291,7 @@ class SolutionValidator:
             (workspace / filename).write_text(code, encoding="utf-8")
 
             # Initialize Go module
-            go_mod = self.executor.run(
+            self.executor.run(
                 command=["go", "mod", "init", "code-solver-test"],
                 cwd=workspace,
             )

@@ -370,7 +370,6 @@ def health_check(solver: CodeSolver) -> None:
 
     # Summary
     results_str = str(results)
-    ok_count = len([row for row in results_str.split('\n') if '✓ OK' in row])
     warning_count = len(
         [row for row in results_str.split('\n') if '⚠ AVISO' in row])
     fail_count = len(

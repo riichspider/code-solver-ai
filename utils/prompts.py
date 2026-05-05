@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 import re
 import warnings
-from typing import Any
+from typing import Any, Optional
 
 
-def sanitize_input(text: str) -> str:
+def sanitize_input(text: Optional[str]) -> Optional[str]:
     """
     Sanitize input text to prevent prompt injection attacks.
 

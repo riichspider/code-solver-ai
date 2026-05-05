@@ -24,7 +24,7 @@ class ProblemReasoner:
         options: dict[str, Any],
     ) -> dict[str, Any]:
         fallback = self._fallback(
-            problem, classification, complexity, language, understanding)
+            classification, complexity, language, understanding)
         if self.client is None:
             log_warning(
                 self.logger,
@@ -75,7 +75,6 @@ class ProblemReasoner:
 
     def _fallback(
         self,
-        problem: str,
         classification: str,
         complexity: int,
         language: str,

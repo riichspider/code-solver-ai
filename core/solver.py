@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -284,7 +284,7 @@ class CodeSolver:
 
         metadata = {
             "classification_reason": classification.get("why", ""),
-            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "repair_applied": repair_applied,
             "context_files": [item.name for item in request.context_items],
             "similar_context_count": len(similar_context),
