@@ -1,7 +1,7 @@
 # code-solver-ai — contexto para IA
 
 ## Estado atual
-- 24 testes passando (100% pass rate)
+- 39 testes passando (100% pass rate)
 - Python 3.10, Ollama local, Streamlit + CLI
 - Health Score Revibe: ~75 (era 67 antes das melhorias)
 - Fase 1, 2 e 3 do roadmap concluídas
@@ -36,6 +36,10 @@
 - Logging estruturado em core/ (utils/logger.py)
 - Labels do GitHub configurados
 - .editorconfig adicionado
+- Issues do SonarQube corrigidas (Code Smells)
+- Strings duplicadas extraídas para constantes
+- Exception handling melhorado
+- Demo screenshot adicionado ao README
 
 ## Arquitetura
 - core/solver.py — orquestrador principal
