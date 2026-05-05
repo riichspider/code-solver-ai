@@ -9,7 +9,7 @@
 
 Pipeline completo funcionando com Ollama local — classificação, geração de código, testes e validação em tempo real.
 
-![Code Solver AI em ação](docs/demo.png)
+![Code Solver AI em ação](docs/demo.jpeg)
 
 Uma ferramenta de IA local que analisa problemas de programação e gera soluções completas com:
 

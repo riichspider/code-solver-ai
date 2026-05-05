@@ -22,7 +22,7 @@ To complete the demo section in the README.md, you need to add a screenshot of t
    - Make sure the screenshot is clear and readable
 
 4. **Save the screenshot:**
-   - Save the image as `docs/demo.png`
+   - Save the image as `docs/demo.jpng`
    - Recommended size: 1200x800 pixels or similar
    - Format: PNG (preferred for clarity)
 
