@@ -140,7 +140,12 @@ class ProblemClassifier:
         language: str,
         complexity: int,
     ) -> list[str]:
-        bucket = "complexity-high" if complexity >= 8 else "complexity-medium" if complexity >= 5 else "complexity-low"
+        if complexity >= 8:
+            bucket = "complexity-high"
+        elif complexity >= 5:
+            bucket = "complexity-medium"
+        else:
+            bucket = "complexity-low"
         normalized: list[str] = []
         for label in labels:
             text = str(label).strip().lower().replace(" ", "-")

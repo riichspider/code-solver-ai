@@ -60,7 +60,7 @@ class SolverCache:
 
             # Return the actual payload (without metadata)
             return data.get("payload", data)
-        except (json.JSONDecodeError, ValueError, KeyError):
+        except (json.JSONDecodeError, KeyError):
             # Corrupted cache file, remove it
             path.unlink(missing_ok=True)
             return None
@@ -90,7 +90,7 @@ class SolverCache:
                     if current_time - cached_at > self.ttl:
                         cache_file.unlink()
                         removed_count += 1
-            except (json.JSONDecodeError, ValueError, KeyError):
+            except (json.JSONDecodeError, KeyError):
                 # Remove corrupted cache files
                 cache_file.unlink()
                 removed_count += 1

@@ -79,7 +79,7 @@ class SolutionValidator:
             if status == "failed":
                 log_error(
                     self.logger,
-                    Exception(
+                    RuntimeError(
                         f"Python validation failed with return code {result.returncode}"),
                     context="_validate_python",
                     details={
