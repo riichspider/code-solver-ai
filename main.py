@@ -18,18 +18,28 @@ from core.solver import CodeSolver, ContextItem, SolveRequest
 BASE_DIR = Path(__file__).resolve().parent
 console = Console()
 
+# Constants for repeated string literals
+STATUS_OK = "[green]✓ OK[/green]"
+STATUS_FAIL = "[red]✗ FALHA[/red]"
+STATUS_WARN = "[yellow]⚠ AVISO[/yellow]"
+LABEL_MODELS = "Modelos instalados"
+LABEL_NODE = "Node.js"
+LABEL_DB_DIR = LABEL_DB_DIR
+LABEL_EXPORTS_DIR = LABEL_EXPORTS_DIR
+LABEL_CLASS = LABEL_CLASS
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="code-solver",
-        description="Resolve problemas de programação localmente com Ollama.",
+        prog=PROG_NAME,
+        description=DESCRIPTION,
     )
     parser.add_argument("problem", nargs="?",
-                        help="Descrição direta do problema.")
+                        help=PROBLEM_HELP)
     parser.add_argument(
-        "--problem-file", help="Arquivo .txt/.md com um único problema.")
+        "--problem-file", help=PROBLEM_FILE_HELP)
     parser.add_argument(
-        "--batch-file", help="Arquivo .txt/.md com múltiplos problemas.")
+        "--batch-file", help=BATCH_FILE_HELP)
     parser.add_argument(
         "--context-file",
         action="append",
@@ -93,7 +103,7 @@ def resolve_problem_argument(args: argparse.Namespace) -> str | None:
 
 def render_result(result, export_paths: dict[str, str] | None = None) -> None:
     header = Table.grid(padding=(0, 2))
-    header.add_row("Classificação", result.classification)
+    header.add_row(LABEL_CLASS, result.classification)
     header.add_row("Complexidade", str(result.complexity))
     header.add_row("Labels", ", ".join(result.labels))
     header.add_row("Modelo", result.model)
@@ -159,7 +169,7 @@ def solve_batch(solver: CodeSolver, args: argparse.Namespace) -> None:
     # Display results summary
     summary = Table(title="Resumo do batch")
     summary.add_column("#")
-    summary.add_column("Classificação")
+    summary.add_column(LABEL_CLASS)
     summary.add_column("Complexidade")
     summary.add_column("Status")
     summary.add_column("Modelo")
@@ -184,7 +194,7 @@ def solve_batch(solver: CodeSolver, args: argparse.Namespace) -> None:
 def compare_models(solver: CodeSolver, problem: str, args: argparse.Namespace) -> None:
     comparison = Table(title="Comparação de modelos")
     comparison.add_column("Modelo")
-    comparison.add_column("Classificação")
+    comparison.add_column(LABEL_CLASS)
     comparison.add_column("Complexidade")
     comparison.add_column("Validação")
     comparison.add_column("Labels")
@@ -230,14 +240,14 @@ def health_check(solver: CodeSolver) -> None:
         models = solver.available_models()
         results.add_row(
             "Ollama Service",
-            "[green]✓ OK[/green]",
+            STATUS_OK,
             f"{len(models)} modelos disponíveis"
         )
         ollama_ok = True
     except Exception as e:
         results.add_row(
             "Ollama Service",
-            "[red]✗ FALHA[/red]",
+            STATUS_FAIL,
             f"Erro: {str(e)[:50]}..."
         )
         ollama_ok = False
@@ -251,20 +261,20 @@ def health_check(solver: CodeSolver) -> None:
                 if len(models) > 3:
                     model_list += f" (+{len(models)-3})"
                 results.add_row(
-                    "Modelos Instalados",
-                    "[green]✓ OK[/green]",
+                    LABEL_MODELS,
+                    STATUS_OK,
                     model_list
                 )
             else:
                 results.add_row(
-                    "Modelos Instalados",
-                    "[yellow]⚠ AVISO[/yellow]",
+                    LABEL_MODELS,
+                    STATUS_WARN,
                     "Nenhum modelo encontrado"
                 )
         except Exception as e:
             results.add_row(
-                "Modelos Instalados",
-                "[red]✗ FALHA[/red]",
+                LABEL_MODELS,
+                STATUS_FAIL,
                 f"Erro: {str(e)[:50]}..."
             )
 
@@ -272,7 +282,7 @@ def health_check(solver: CodeSolver) -> None:
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     results.add_row(
         "Python",
-        "[green]✓ OK[/green]",
+        STATUS_OK,
         f"v{python_version}"
     )
 
@@ -284,20 +294,20 @@ def health_check(solver: CodeSolver) -> None:
                 ["node", "--version"], capture_output=True, text=True, timeout=5)
             node_version = result.stdout.strip()
             results.add_row(
-                "Node.js",
-                "[green]✓ OK[/green]",
+                LABEL_NODE,
+                STATUS_OK,
                 node_version
             )
         except Exception:
             results.add_row(
-                "Node.js",
-                "[yellow]⚠ AVISO[/yellow]",
+                LABEL_NODE,
+                STATUS_WARN,
                 "Instalado mas não acessível"
             )
     else:
         results.add_row(
-            "Node.js",
-            "[yellow]⚠ AVISO[/yellow]",
+            LABEL_NODE,
+            STATUS_WARN,
             "Não encontrado (validação JS/TS limitada)"
         )
 
@@ -309,13 +319,13 @@ def health_check(solver: CodeSolver) -> None:
             cache_count = len(list(cache_dir.glob("*.json"))
                               ) if cache_dir.exists() else 0
             results.add_row(
-                "Diretório db/",
-                "[green]✓ OK[/green]",
+                LABEL_DB_DIR,
+                STATUS_OK,
                 f"Acessível, {cache_count} arquivos cache"
             )
         else:
             results.add_row(
-                "Diretório db/",
+                LABEL_DB_DIR,
                 "[red]✗ FALHA[/red]",
                 "Caminho existe mas não é diretório"
             )
@@ -324,13 +334,13 @@ def health_check(solver: CodeSolver) -> None:
             db_dir.mkdir(parents=True, exist_ok=True)
             (db_dir / "cache").mkdir(exist_ok=True)
             results.add_row(
-                "Diretório db/",
+                LABEL_DB_DIR,
                 "[green]✓ OK[/green]",
                 "Criado com sucesso"
             )
         except Exception as e:
             results.add_row(
-                "Diretório db/",
+                LABEL_DB_DIR,
                 "[red]✗ FALHA[/red]",
                 f"Erro ao criar: {str(e)[:50]}..."
             )
@@ -340,13 +350,13 @@ def health_check(solver: CodeSolver) -> None:
     if exports_dir.exists():
         if exports_dir.is_dir():
             results.add_row(
-                "Diretório exports/",
+                LABEL_EXPORTS_DIR,
                 "[green]✓ OK[/green]",
                 "Acessível para exportações"
             )
         else:
             results.add_row(
-                "Diretório exports/",
+                LABEL_EXPORTS_DIR,
                 "[red]✗ FALHA[/red]",
                 "Caminho existe mas não é diretório"
             )
@@ -354,13 +364,13 @@ def health_check(solver: CodeSolver) -> None:
         try:
             exports_dir.mkdir(parents=True, exist_ok=True)
             results.add_row(
-                "Diretório exports/",
+                LABEL_EXPORTS_DIR,
                 "[green]✓ OK[/green]",
                 "Criado com sucesso"
             )
         except Exception as e:
             results.add_row(
-                "Diretório exports/",
+                LABEL_EXPORTS_DIR,
                 "[red]✗ FALHA[/red]",
                 f"Erro ao criar: {str(e)[:50]}..."
             )
