@@ -324,21 +324,6 @@ class CodeSolver:
         payload["history_id"] = history_id
         if request.use_cache and self.cache_enabled:
             self.cache.set(cache_key, payload)
-
-        # Log pipeline completion
-        log_pipeline_stage(
-            self.logger,
-            "solve",
-            "completed",
-            details={
-                "classification": classification["classification"],
-                "complexity": classification["complexity"],
-                "validation_status": validation.get("status"),
-                "repair_applied": repair_applied,
-                "history_id": history_id
-            }
-        )
-
         return result
 
     def solve_batch(self, problems: list[str], template: SolveRequest) -> list[SolveResult]:
