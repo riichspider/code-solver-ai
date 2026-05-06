@@ -294,11 +294,12 @@ def health_check(solver: CodeSolver) -> None:
     )
 
     # 4. Check Node.js
-    if shutil.which("node") is not None:
+    node_path = shutil.which("node")
+    if node_path is not None:
         try:
             import subprocess
             result = subprocess.run(
-                ["node", "--version"], capture_output=True, text=True, timeout=5)
+                [node_path, "--version"], capture_output=True, text=True, timeout=5)
             node_version = result.stdout.strip()
             results.add_row(
                 LABEL_NODE,

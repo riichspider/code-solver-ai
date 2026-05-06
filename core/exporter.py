@@ -32,7 +32,7 @@ class SolutionExporter:
         # Cleanup old exports if needed
         self._cleanup_old_exports(export_base, max_exports)
 
-        safe_slug = slug or self._slugify(
+        safe_slug = slug or SolutionExporter._slugify(
             result.classification + "-" + result.problem[:40])
         output_dir = export_base / \
             f"{safe_slug}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
@@ -95,7 +95,8 @@ class SolutionExporter:
                     print(
                         f"Warning: Could not remove old export {dir_path}: {e}")
 
-    def _slugify(self, text: str) -> str:
+    @staticmethod
+    def _slugify(text: str) -> str:
         slug = re.sub(r"[^a-zA-Z0-9]+", "-", text.lower()).strip("-")
         return slug[:50] or "solution"
 
@@ -105,7 +106,7 @@ class SolutionExporter:
             return []
 
         parts = [
-            self._clean_batch_item(part)
+            SolutionExporter._clean_batch_item(part)
             for part in re.split(r"(?m)^\s*---\s*$", raw)
             if part.strip()
         ]
@@ -113,13 +114,14 @@ class SolutionExporter:
             return [part for part in parts if part]
 
         paragraphs = [
-            self._clean_batch_item(part)
+            SolutionExporter._clean_batch_item(part)
             for part in re.split(r"\n\s*\n", raw)
             if part.strip()
         ]
         return paragraphs
 
-    def _clean_batch_item(self, item: str) -> str:
+    @staticmethod
+    def _clean_batch_item(item: str) -> str:
         # Remove leading/trailing whitespace and common prefixes
         lines = item.strip().split('\n')
         cleaned_lines = []
