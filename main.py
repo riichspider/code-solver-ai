@@ -12,7 +12,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
-from core.solver import CodeSolver, ContextItem, SolveRequest
+from core.pipeline import CodeSolver, ContextItem, SolveRequest
 
 
 BASE_DIR = Path(__file__).resolve().parent

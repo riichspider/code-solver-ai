@@ -21,7 +21,7 @@ from core.exporter import SolutionExporter
 from core.models import ContextItem, SolveRequest, SolveResult
 from core.types import SolveMetadata, ValidationResult
 from core.validator import SolutionValidator
-from models.ollama_client import OllamaClient
+from models.fallback_client import FallbackClient
 from utils.logger import get_logger, log_pipeline_stage, log_error
 from utils.markdown import render_solution_markdown
 
@@ -36,7 +36,7 @@ class CodeSolver:
         self,
         base_dir: Path,
         config: dict[str, Any],
-        client: OllamaClient | None = None,
+        client: FallbackClient | None = None,
     ) -> None:
         self.base_dir = Path(base_dir)
         self.config = config
@@ -50,10 +50,10 @@ class CodeSolver:
             "export", {}).get("directory", "exports")
 
         ollama_config = config.get("ollama", {})
-        self.client = client or OllamaClient(
-            base_url=ollama_config.get(
+        self.client = client or FallbackClient(
+            ollama_base_url=ollama_config.get(
                 "base_url", "http://localhost:11434/api"),
-            default_model=self.default_model,
+            ollama_default_model=self.default_model,
             timeout_seconds=ollama_config.get("timeout_seconds", 240),
             keep_alive=ollama_config.get("keep_alive", "10m"),
             default_options=ollama_config.get("options", {}),
@@ -90,222 +90,195 @@ class CodeSolver:
         configured = list(dict.fromkeys(self.config.get(
             "preferred_models", []) + [self.default_model]))
         discovered, _ = self._get_installed_models(refresh=True)
-        return discovered or configured
+        if discovered:
+            return discovered
+        return configured
 
     def solve(self, request: SolveRequest) -> SolveResult:
         problem = request.problem.strip()
         if not problem:
             raise ValueError("O problema não pode estar vazio.")
 
-        # Check cache first
-        cache_key = None
+        language = (request.language or "python").strip().lower()
+        if language not in self.supported_languages:
+            language = "python"
+        mode = request.mode if request.mode in {"fast", "deep"} else "fast"
+        model, model_resolution = self._resolve_model(request.model)
+
+        log_pipeline_stage(
+            self.logger, "solve", "started",
+            details={
+                "problem_length": len(problem),
+                "language": language,
+                "model": model,
+                "mode": mode,
+                "cache_enabled": request.use_cache and self.cache_enabled,
+                "context_items": len(request.context_items),
+            },
+        )
+
+        context_text = self._format_context_items(request.context_items)
+        cache_key = self.cache.build_key(
+            problem, language, model, mode, context_text)
         if request.use_cache and self.cache_enabled:
-            cache_key = self.cache.build_key(
-                problem=problem,
-                language=request.language,
-                model=request.model or self.default_model,
-                mode=request.mode,
-                context_text=self._format_context_items(request.context_items),
-            )
-            cached_result = self.cache.get(cache_key)
-            if cached_result:
-                self.logger.info(f"Cache hit for problem: {problem[:50]}...")
-                return SolveResult.from_dict(cached_result)
+            cached_payload = self.cache.get(cache_key)
+            if cached_payload:
+                log_pipeline_stage(
+                    self.logger, "solve", "cache_hit",
+                    details={"cache_key": cache_key[:50] + "..."},
+                )
+                cached_payload["cached"] = True
+                return SolveResult.from_dict(cached_payload)
 
-        # Start pipeline
-        started_at = datetime.now(timezone.utc)
-        log_pipeline_stage(self.logger, "classify", problem,
-                           {"language": request.language})
-
-        # Step 1: Classify problem
-        classification_result = self.classifier.classify(
-            problem=problem,
-            language_hint=request.language,
-            context_text=self._format_context_items(request.context_items),
-            similar_context=self.history.find_similar(
-                problem, limit=self.similar_results),
-            model=request.model or self.default_model,
-            options=self._build_model_options(request.mode),
+        similar_context = self.history.find_similar(
+            problem=problem, language=language, limit=self.similar_results,
         )
-        classification = classification_result.get("classification", "")
-        complexity = classification_result.get("complexity", 1)
-        labels = classification_result.get("labels", [])
+        options = self._build_model_options(mode)
 
-        # Step 2: Generate reasoning
-        log_pipeline_stage(self.logger, "reason", problem,
-                           {"language": request.language})
-        # Generate basic understanding first
-        basic_understanding = f"Problem: {problem}\nClassification: {classification}\nComplexity: {complexity}"
-        reasoning_result = self.reasoner.analyze(
+        classification = self.classifier.classify(
             problem=problem,
-            classification=classification,
-            complexity=complexity,
-            language=request.language,
-            understanding=basic_understanding,
-            context_text=self._format_context_items(request.context_items),
-            similar_context=self.history.find_similar(
-                problem, limit=self.similar_results),
-            model=request.model or self.default_model,
-            options=self._build_model_options(request.mode),
+            language_hint=language,
+            context_text=context_text,
+            similar_context=similar_context,
+            model=model,
+            options=options,
         )
-        understanding = reasoning_result.get("understanding", "")
-        plan_steps = reasoning_result.get("plan_steps", [])
-        constraints = reasoning_result.get("constraints", [])
-        risks = reasoning_result.get("risks", [])
-        success_criteria = reasoning_result.get("success_criteria", [])
+        language = classification.get("language", language)
 
-        # Step 3: Generate code
-        log_pipeline_stage(self.logger, "generate", problem,
-                           {"language": request.language})
+        reasoning = self.reasoner.analyze(
+            problem=problem,
+            classification=classification["classification"],
+            complexity=classification["complexity"],
+            language=language,
+            understanding=classification["understanding"],
+            context_text=context_text,
+            similar_context=similar_context,
+            model=model,
+            options=options,
+        )
+
+        solution = None
+        generation_error = None
         try:
-            generation_result = self.coder.generate(
+            solution = self.coder.generate(
                 problem=problem,
-                classification=classification,
-                language=request.language,
-                understanding=understanding,
-                plan_steps=plan_steps,
-                constraints=constraints,
-                risks=risks,
-                success_criteria=success_criteria,
-                context_text=self._format_context_items(request.context_items),
-                similar_context=self.history.find_similar(
-                    problem, limit=self.similar_results),
-                model=request.model or self._resolve_model(request.model)[0],
-                mode=request.mode,
-                options=self._build_model_options(request.mode),
+                classification=classification["classification"],
+                language=language,
+                understanding=reasoning["understanding"],
+                plan_steps=reasoning["plan_steps"],
+                constraints=reasoning["constraints"],
+                risks=reasoning["risks"],
+                success_criteria=reasoning["success_criteria"],
+                context_text=context_text,
+                similar_context=similar_context,
+                model=model,
+                mode=mode,
+                options=options,
             )
-            code = generation_result.get("code", "")
-            tests = generation_result.get("tests", "")
-            filename = generation_result.get(
-                "filename", f"solution.{self._get_file_extension(request.language)}")
-            test_filename = generation_result.get(
-                "test_filename", f"test_solution.{self._get_file_extension(request.language)}")
-        except CodeGenerationError as e:
-            self.logger.error(f"Code generation failed: {e}")
-            raise
+        except CodeGenerationError as exc:
+            generation_error = exc
+            solution = {
+                "filename": "solution.py",
+                "test_filename": "test_solution.py",
+                "code": "",
+                "tests": "",
+                "explanation": [f"Generation failed: {str(exc)}"],
+                "notes": ["Auto-repair will be attempted"],
+            }
 
-        # Step 4: Validate solution
-        log_pipeline_stage(self.logger, "validate", problem,
-                           {"language": request.language})
         validation = self.validator.validate(
-            language=request.language,
-            code=code,
-            tests=tests,
-            filename=filename,
-            test_filename=test_filename,
+            language=language,
+            code=solution["code"],
+            tests=solution["tests"],
+            filename=solution["filename"],
+            test_filename=solution["test_filename"],
         )
 
-        # Step 5: Generate explanation and markdown
-        explanation = self._generate_explanation(
-            problem, classification, understanding, plan_steps, constraints,
-            risks, success_criteria, code, tests, validation, request.language
+        repair_applied = False
+        should_attempt_repair = (
+            request.auto_repair
+            and (validation.get("status") == "failed" or generation_error is not None)
         )
 
-        # Prepare result dict for markdown rendering
-        result_dict = {
-            "problem": problem,
-            "classification": classification,
-            "complexity": complexity,
-            "labels": labels,
-            "model": request.model or self.default_model,
-            "mode": request.mode,
-            "understanding": understanding,
-            "plan_steps": plan_steps,
-            "constraints": constraints,
-            "risks": risks,
-            "success_criteria": success_criteria,
-            "code": code,
-            "tests": tests,
-            "explanation": explanation,
-            "validation": validation,
-            "language": request.language,
-            "filename": filename,
-            "test_filename": test_filename,
-            "similar_context": [],
-            "metadata": {},
-        }
-        markdown = render_solution_markdown(result_dict)
+        if should_attempt_repair:
+            repair_validation = (
+                {
+                    "status": "failed",
+                    "errors": [f"Code generation failed: {str(generation_error)}"],
+                    "details": {"generation_error": True},
+                }
+                if generation_error is not None
+                else validation
+            )
 
-        # Create result
-        finished_at = datetime.now(timezone.utc)
-        metadata: SolveMetadata = {
-            "started_at": started_at.isoformat(),
-            "finished_at": finished_at.isoformat(),
-            "duration_seconds": (finished_at - started_at).total_seconds(),
-            "ollama_url": getattr(self.client, 'base_url', 'http://localhost:11434/api'),
-            "cache_hit": False,
+            repaired_solution = self.coder.repair(
+                problem=problem,
+                language=language,
+                previous_solution=solution,
+                validation=repair_validation,
+                model=model,
+                options=options,
+            )
+            repaired_validation = self.validator.validate(
+                language=language,
+                code=repaired_solution["code"],
+                tests=repaired_solution["tests"],
+                filename=repaired_solution["filename"],
+                test_filename=repaired_solution["test_filename"],
+            )
+            if repaired_validation.get("status") == "passed":
+                solution = repaired_solution
+                validation = repaired_validation
+                repair_applied = True
+            elif generation_error is not None:
+                raise RuntimeError(
+                    "Falha ao gerar uma solução executável e a tentativa de reparo também falhou. "
+                    "Tente usar um modelo maior, ativar `--mode deep` ou enviar mais contexto. "
+                    f"Detalhe: {generation_error}"
+                ) from generation_error
+
+        metadata = {
+            "classification_reason": classification.get("why", ""),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "repair_applied": repair_applied,
+            "context_files": [item.name for item in request.context_items],
+            "similar_context_count": len(similar_context),
+            "default_model_requested": request.model is None,
+            "configured_default_model": self.default_model,
+            "model_resolution": model_resolution,
         }
 
         result = SolveResult(
             problem=problem,
-            classification=classification,
-            complexity=complexity,
-            labels=labels,
-            language=request.language,
-            model=request.model or self.default_model,
-            mode=request.mode,
-            understanding=understanding,
-            plan_steps=plan_steps,
-            constraints=constraints,
-            risks=risks,
-            success_criteria=success_criteria,
-            code=code,
-            tests=tests,
-            filename=filename,
-            test_filename=test_filename,
-            explanation=explanation,
+            classification=classification["classification"],
+            complexity=classification["complexity"],
+            labels=classification["labels"],
+            language=language,
+            model=model,
+            mode=mode,
+            understanding=reasoning["understanding"],
+            plan_steps=reasoning["plan_steps"],
+            constraints=reasoning["constraints"],
+            risks=reasoning["risks"],
+            success_criteria=reasoning["success_criteria"],
+            code=solution["code"],
+            tests=solution["tests"],
+            filename=solution["filename"],
+            test_filename=solution["test_filename"],
+            explanation=solution["explanation"],
             validation=validation,
-            markdown=markdown,
-            similar_context=self.history.find_similar(
-                problem, limit=self.similar_results),
+            markdown="",
+            similar_context=similar_context,
             metadata=metadata,
-            cached=False,
         )
+        result.markdown = render_solution_markdown(result.to_dict())
 
-        # Store in cache
-        if request.use_cache and self.cache_enabled:
-            self.cache.set(cache_key, result.to_dict())
-
-        # Store in history
-        history_payload = {
-            "problem": problem,
-            "classification": classification,
-            "complexity": complexity,
-            "labels": labels,
-            "understanding": understanding,
-            "plan_steps": plan_steps,
-            "constraints": constraints,
-            "risks": risks,
-            "success_criteria": success_criteria,
-            "code": code,
-            "tests": tests,
-            "language": request.language,
-            "validation": validation,
-            "explanation": explanation,
-            "model": request.model or self.default_model,
-            "mode": request.mode,
-            "markdown": markdown,
-            "metadata": metadata,
-        }
-        history_id = self.history.save_result(history_payload)
+        payload = result.to_dict()
+        history_id = self.history.save_result(payload)
         result.history_id = history_id
-
-        # Auto-repair if needed
-        if request.auto_repair and validation["status"] == "failed":
-            self.logger.info("Attempting auto-repair...")
-            try:
-                repaired_result = self._auto_repair(result, request)
-                if repaired_result.validation["status"] == "passed":
-                    self.logger.info("Auto-repair successful!")
-                    result = repaired_result
-                    if request.use_cache and self.cache_enabled:
-                        self.cache.set(cache_key, result.to_dict())
-                else:
-                    self.logger.warning(
-                        "Auto-repair failed, returning original result")
-            except Exception as e:
-                self.logger.error(f"Auto-repair failed: {e}")
-
+        payload["history_id"] = history_id
+        if request.use_cache and self.cache_enabled:
+            self.cache.set(cache_key, payload)
         return result
 
     def solve_batch(self, problems: list[str], template: SolveRequest) -> list[SolveResult]:
@@ -480,55 +453,68 @@ class CodeSolver:
             self.logger.error(f"Auto-repair failed: {e}")
             return result
 
-    def _get_installed_models(self, refresh: bool = False) -> tuple[list[str], str | None]:
+    def _get_installed_models(self, refresh: bool = False) -> tuple[list[str], Exception | None]:
         """Get list of installed models from Ollama."""
         if self._installed_models_cache is not None and not refresh:
             return self._installed_models_cache, None
 
         try:
             models = self.client.list_models()
-            model_names = [model["name"] for model in models]
+            # Handle both string list and dict list formats
+            if models and isinstance(models[0], str):
+                # Fake client returns simple strings
+                model_names = models
+            else:
+                # Real Ollama API returns objects with "name" field
+                model_names = [model["name"] for model in models]
             self._installed_models_cache = model_names
             return model_names, None
         except Exception as e:
             self.logger.warning(f"Failed to get installed models: {e}")
-            return [], str(e)
+            return [], e
 
     def _resolve_model(self, requested_model: str | None) -> tuple[str, dict[str, Any]]:
         """Resolve the model to use, falling back to available models."""
         installed, lookup_error = self._get_installed_models()
-        metadata = {
+        metadata: dict[str, Any] = {
             "requested_model": requested_model,
-            "default_model": self.default_model,
-            "installed_models": installed,
-            "lookup_error": lookup_error,
+            "configured_default_model": self.default_model,
+            "resolved_model": None,
+            "fallback_used": False,
+            "lookup_error": str(lookup_error) if lookup_error else "",
+            "available_models": installed,
         }
 
         if requested_model:
-            if requested_model in installed:
-                return requested_model, metadata
-            else:
-                self.logger.warning(
-                    f"Requested model '{requested_model}' not found in installed models: {installed}"
+            if installed and requested_model not in installed:
+                raise ValueError(
+                    f"Modelo solicitado '{requested_model}' não está instalado no Ollama. "
+                    f"Disponíveis: {', '.join(installed)}"
                 )
+            metadata["resolved_model"] = requested_model
+            return requested_model, metadata
 
-        # Try default model
-        if self.default_model in installed:
+        if not installed:
+            metadata["resolved_model"] = self.default_model
             return self.default_model, metadata
 
-        # Fall back to first available model
-        if installed:
-            fallback = installed[0]
-            self.logger.warning(
-                f"Default model '{self.default_model}' not found, using fallback: {fallback}"
-            )
-            return fallback, metadata
+        # Check if default model is installed
+        if self.default_model in installed:
+            metadata["resolved_model"] = self.default_model
+            return self.default_model, metadata
 
-        # No models available
-        error_msg = f"No models available. Requested: {requested_model}, Default: {self.default_model}"
-        if lookup_error:
-            error_msg += f", Lookup error: {lookup_error}"
-        raise ValueError(error_msg)
+        # Try preferred models in order
+        preferred = self.config.get("preferred_models", [])
+        for candidate in preferred:
+            if candidate in installed:
+                metadata["resolved_model"] = candidate
+                metadata["fallback_used"] = True
+                return candidate, metadata
+
+        # Fall back to first available model
+        metadata["resolved_model"] = installed[0]
+        metadata["fallback_used"] = True
+        return installed[0], metadata
 
     def _resolve_path(self, relative_path: str) -> Path:
         return (self.base_dir / relative_path).resolve()
@@ -539,9 +525,11 @@ class CodeSolver:
         profile.pop("reasoning_style", None)  # Handle separately
         return {**base_options, **profile}
 
-    def _format_context_items(self, context_items: list[Any]) -> list[str]:
+    def _format_context_items(self, context_items: list[ContextItem]) -> str:
         """Format context items for prompt inclusion."""
-        sections = []
+        if not context_items:
+            return ""
+        sections: list[str] = []
         for item in context_items:
             sections.append(f"### {item.name}\n{item.content.strip()}")
         return "\n\n".join(sections).strip()
@@ -564,7 +552,41 @@ class CodeSolver:
 
     def parse_batch_text(self, text: str) -> list[str]:
         """Parse batch text into individual problems."""
-        return self.exporter.parse_batch_text(text)
+        raw = text.replace("\ufeff", "").replace("\r\n", "\n").strip()
+        if not raw:
+            return []
+
+        parts = [
+            self._clean_batch_item(part)
+            for part in re.split(r"(?m)^\s*---\s*$", raw)
+            if part.strip()
+        ]
+        if len(parts) > 1:
+            return [part for part in parts if part]
+
+        paragraphs = [
+            self._clean_batch_item(part)
+            for part in re.split(r"\n\s*\n", raw)
+            if part.strip()
+        ]
+        if len(paragraphs) > 1:
+            return [part for part in paragraphs if part]
+
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        bullet_pattern = re.compile(r"^(?:[-*•]|\d+[.)]) +")
+        if len(lines) > 1 and all(bullet_pattern.match(line) for line in lines):
+            return [
+                self._clean_batch_item(bullet_pattern.sub("", line, count=1))
+                for line in lines
+                if self._clean_batch_item(bullet_pattern.sub("", line, count=1))
+            ]
+
+        cleaned = self._clean_batch_item(raw)
+        return [cleaned] if cleaned else []
+
+    def _clean_batch_item(self, text: str) -> str:
+        """Clean individual batch item by removing extra markers."""
+        return text.strip().strip("#").strip()
 
     def export_result(
         self,

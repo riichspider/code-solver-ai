@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from core.solver import CodeSolver  # re-export
+from core.pipeline import CodeSolver  # re-export
 from core.models import SolveRequest
 
 
@@ -76,8 +76,10 @@ def build_config():
 
 
 def test_solver_pipeline_runs_end_to_end_with_fake_client(tmp_path):
-    solver = CodeSolver(base_dir=tmp_path, config=build_config(), client=FakeOllamaClient())
-    request = SolveRequest(problem="Create an add function in Python", language="python")
+    solver = CodeSolver(base_dir=tmp_path,
+                        config=build_config(), client=FakeOllamaClient())
+    request = SolveRequest(
+        problem="Create an add function in Python", language="python")
 
     result = solver.solve(request)
 
@@ -93,8 +95,10 @@ def test_solver_pipeline_runs_end_to_end_with_fake_client(tmp_path):
 
 def test_solver_uses_cache_on_second_call(tmp_path):
     fake_client = FakeOllamaClient()
-    solver = CodeSolver(base_dir=tmp_path, config=build_config(), client=fake_client)
-    request = SolveRequest(problem="Create an add function in Python", language="python")
+    solver = CodeSolver(base_dir=tmp_path,
+                        config=build_config(), client=fake_client)
+    request = SolveRequest(
+        problem="Create an add function in Python", language="python")
 
     first = solver.solve(request)
     second = solver.solve(request)
@@ -111,7 +115,8 @@ def test_solver_falls_back_to_installed_model_when_default_is_missing(tmp_path):
     config["preferred_models"] = ["missing-model", "fake-model"]
     solver = CodeSolver(base_dir=tmp_path, config=config, client=fake_client)
 
-    result = solver.solve(SolveRequest(problem="Create an add function in Python", language="python"))
+    result = solver.solve(SolveRequest(
+        problem="Create an add function in Python", language="python"))
 
     assert result.model == "fake-model"
     assert fake_client.list_models_calls >= 1
@@ -119,7 +124,8 @@ def test_solver_falls_back_to_installed_model_when_default_is_missing(tmp_path):
 
 def test_solver_rejects_explicit_missing_model_when_list_is_available(tmp_path):
     fake_client = FakeOllamaClient()
-    solver = CodeSolver(base_dir=tmp_path, config=build_config(), client=fake_client)
+    solver = CodeSolver(base_dir=tmp_path,
+                        config=build_config(), client=fake_client)
 
     with pytest.raises(ValueError, match="não está instalado"):
         solver.solve(

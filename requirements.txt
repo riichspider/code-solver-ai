@@ -4,3 +4,4 @@ streamlit==1.57.0
 rich==15.0.0
 pytest==9.0.3
 pytest-cov==5.0.0
+python-dotenv==1.0.1

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from core.solver import CodeSolver, ContextItem, SolveRequest
+from core.pipeline import CodeSolver, ContextItem, SolveRequest
 
 
 BASE_DIR = Path(__file__).resolve().parent

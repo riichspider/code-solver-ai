@@ -507,7 +507,7 @@ CACHE_HIT_RATE = Gauge('code_solver_cache_hit_rate', 'Cache hit rate')
 ```python
 # health.py
 from fastapi import FastAPI
-from core.solver import CodeSolver
+from core.pipeline import CodeSolver
 
 app = FastAPI()
 

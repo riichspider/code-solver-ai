@@ -1,4 +1,4 @@
-from core.solver import CodeSolver  # re-exportado de core.pipeline
+from core.pipeline import CodeSolver  # re-exportado de core.pipeline
 
 
 class FakeOllamaClient:
@@ -35,7 +35,8 @@ def test_parse_batch_text_supports_separator_blocks(tmp_path):
     solver = build_solver(tmp_path)
     text = "Primeiro problema\n---\nSegundo problema"
 
-    assert solver.parse_batch_text(text) == ["Primeiro problema", "Segundo problema"]
+    assert solver.parse_batch_text(
+        text) == ["Primeiro problema", "Segundo problema"]
 
 
 def test_parse_batch_text_supports_bullet_lists(tmp_path):
@@ -53,4 +54,5 @@ def test_parse_batch_text_preserves_single_problem_blocks(tmp_path):
     solver = build_solver(tmp_path)
     text = "Corrija o parser atual.\nEle falha com espaços extras."
 
-    assert solver.parse_batch_text(text) == ["Corrija o parser atual.\nEle falha com espaços extras."]
+    assert solver.parse_batch_text(
+        text) == ["Corrija o parser atual.\nEle falha com espaços extras."]

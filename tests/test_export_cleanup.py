@@ -4,7 +4,7 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from core.solver import CodeSolver  # re-export
+from core.pipeline import CodeSolver  # re-export
 from core.models import SolveResult
 from tests.test_helpers import create_mock_solution_result
 
