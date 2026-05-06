@@ -1,0 +1,24 @@
+__pycache__/
+.pytest_cache/
+.streamlit/
+.venv/
+exports/
+db/cache/
+db/history.db
+db/history.db-*
+db/history.db-journal
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# GitNexus internal
+code-solver-ai/.gitnexus/
+.gitnexus/
+
+# Debug files
+git_branches.txt
+git_log.txt
+
+# Windsurf local config
+.windsurf/

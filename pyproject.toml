@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code-solver-ai"
+version = "0.1.0"
+description = "Offline AI code solver powered by local Ollama models"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "requests>=2.33.1",
+  "PyYAML>=6.0.3",
+  "streamlit>=1.57.0",
+  "rich>=15.0.0",
+]
+
+[project.scripts]
+code-solver = "main:main"
+
+[tool.setuptools]
+packages = ["core", "models", "utils"]
+py-modules = ["main", "app"]
+
+[project.optional-dependencies]
+dev = [
+  "pre-commit>=3.0.0",
+  "pytest>=9.0.0",
+  "pytest-cov>=5.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=core --cov=models --cov=utils --cov=templates --cov-report=term-missing --cov-fail-under=50"
+
+[tool.coverage.run]
+omit = ["tests/*", "examples/*"]
+
+[tool.coverage.report]
+show_missing = true

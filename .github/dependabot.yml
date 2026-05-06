@@ -1,0 +1,19 @@
+# Dependabot configuration for code-solver-ai
+# Monitors pip dependencies from pyproject.toml and requirements.txt
+
+version: 2
+updates:
+  - package-ecosystem: "pip" # Monitor Python pip dependencies
+    directory: "/" # Location of package manifests (pyproject.toml, requirements.txt)
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "riichspider"
+    assignees:
+      - "riichspider"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
