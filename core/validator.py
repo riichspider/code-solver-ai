@@ -42,7 +42,7 @@ class SolutionValidator:
             return self._validate_typescript(code, tests, filename, test_filename)
         if normalized_language == "go":
             return self._validate_go(code, tests, filename, test_filename)
-        if normalized_language == "cpp" or normalized_language == "c++":
+        if normalized_language in ("cpp", "c++"):
             return validate_cpp(code, tests, filename, test_filename, self.timeout_seconds)
         if normalized_language == "ruby":
             return validate_ruby(code, tests, filename, test_filename, self.timeout_seconds)
