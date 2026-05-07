@@ -451,7 +451,7 @@ class CodeSolver:
 
         except Exception as e:
             self.logger.error(f"Auto-repair failed: {e}")
-            return result
+            return request
 
     def _get_installed_models(self, refresh: bool = False) -> tuple[list[str], Exception | None]:
         """Get list of installed models from Ollama."""
