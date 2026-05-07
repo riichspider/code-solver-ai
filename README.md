@@ -41,7 +41,10 @@ O sistema implementa um pipeline completo:
 classify → reason → code → validate → auto-repair → report
 ```
 
-- **core/solver.py** - Orquestrador principal do pipeline
+- **core/pipeline.py** — Orquestrador principal do pipeline (fonte canônica)
+- **core/solver.py** — Dataclasses e modelos de dados
+- **core/exporter.py** — Exportação e limpeza de resultados
+- **core/types.py** — TypedDicts: ValidationResult e SolveMetadata
 - **core/classifier.py** - Classifica tipo e complexidade do problema
 - **core/reasoner.py** - Gera plano de solução estruturado
 - **core/coder.py** - Gera código e testes com retry automático
@@ -452,9 +455,9 @@ python -m pytest
 ### 🚀 Planned Features
 
 #### Version 0.2.0
-- [ ] **C++ support** - Code generation and validation
-- [ ] **Ruby support** - Code generation and validation  
-- [ ] **PHP support** - Code generation and validation
+- [x] **C++ support** - Code generation and validation
+- [x] **Ruby support** - Code generation and validation  
+- [x] **PHP support** - Code generation and validation
 - [ ] **LRU eviction** - Smart cache management for large datasets
 - [ ] **Benchmarking suite** - Performance testing and comparison
 - [ ] **Enhanced web UI** - Improved Streamlit interface with more features
@@ -468,8 +471,8 @@ python -m pytest
 - [ ] **Team collaboration** - Shared solutions and team workflows
 
 ### 📊 Progress Tracking
-- **Current**: 39 tests passing (100% pass rate)
-- **Languages**: 6 supported (C++, Ruby, PHP planned)
+- **Current**: 66 tests passing (100% pass rate)
+- **Languages**: 9 supported (Python, JS, TS, Java, Go, Rust, PHP, C++, Ruby)
 - **CI/CD**: Full automation with GitHub Actions
 - **Documentation**: Complete with performance benchmarks
 - **Community**: Production-ready, v1.0.0 released
