@@ -8,7 +8,7 @@ This document contains the results of testing the bug cases with the AI code sol
 |----------|-------------|--------|----------------|-------------|-------|
 | bug_001_python_null_pointer.py | Python NoneType null pointer exception | ✅ Resolved | qwen2.5-coder:latest | Added null validation | 2/2 tests passing |
 | bug_002_javascript_async_race.js | JavaScript async race condition | 🔄 Pending | | | |
-| bug_003_sql_injection.py | SQL injection vulnerability | 🔄 Pending | | | |
+| bug_003_sql_injection.py | SQL injection vulnerability | ⚠️ Partial | qwen2.5-coder:latest | Parameterized queries | Validation failed - missing DB mock |
 
 ## Test Execution Log
 
@@ -28,14 +28,18 @@ This document contains the results of testing the bug cases with the AI code sol
 
 ### Bug #003 - SQL Injection Vulnerability
 - **Command**: `python main.py "SQL injection vulnerability in UserDatabase class - need parameterized queries"`
-- **Timestamp**: 
-- **Result**: 
+- **Timestamp**: 2026-05-06 22:55
+- **Result**: ⚠️ Partial fix by qwen2.5-coder:latest
+  - Correctly implemented parameterized queries
+  - Validation failed: sqlite3.OperationalError: no such table: users
+  - Root cause: Generated tests don't mock SQLite database
+  - Fix is correct but tests need database mocking 
 
 ## Summary
 
-- **Total Bugs Tested**: 1/3
+- **Total Bugs Tested**: 2/3
 - **Successfully Fixed**: 1
-- **Partially Fixed**: 0  
+- **Partially Fixed**: 1  
 - **Failed to Fix**: 0
 - **Pipeline Errors**: 0
 
