@@ -277,17 +277,17 @@ class CppValidator:
 
     def _find_cpp_compiler(self) -> str | None:
         """Find available C++ compiler (cached)."""
-        if self._compiler_cache is not None:
-            return self._compiler_cache
+        if 'cpp' in self._compiler_cache:
+            return self._compiler_cache['cpp']
 
         compilers = ["g++", "clang++", "cpp"]
 
         for compiler in compilers:
             if shutil.which(compiler):
-                self._compiler_cache = compiler
+                self._compiler_cache['cpp'] = compiler
                 return compiler
 
-        self._compiler_cache = None
+        self._compiler_cache['cpp'] = None
         return None
 
     def _validate_command_security(self, command: list[str]) -> bool:
