@@ -79,7 +79,8 @@ class TestUserDatabase(unittest.TestCase):
         self.assertIn(
             'from unittest.mock import patch, MagicMock', modified_tests)
         self.assertIn('def setup_database_mock():', modified_tests)
-        self.assertIn('@patch("sqlite3.connect")', modified_tests)
+        self.assertIn(
+            '@patch("sqlite3.connect", side_effect=mock_sqlite_connect)', modified_tests)
 
     def test_no_double_injection(self):
         """Test that already mocked tests don't get double injection."""
@@ -148,8 +149,18 @@ class TestDatabase(unittest.TestCase):
 """
 
         for db_code in [pg_code, mysql_code, mongo_code]:
+            # Use fresh copy of tests for each iteration
+            fresh_tests = """
+import unittest
+from solution import get_users
+
+class TestDatabase(unittest.TestCase):
+    def test_get_users(self):
+        result = get_users()
+        self.assertIsInstance(result, list)
+"""
             modified_code, modified_tests = self.validator._inject_database_mocking(
-                db_code, tests)
+                db_code, fresh_tests)
 
             # Code should be unchanged
             self.assertEqual(modified_code, db_code)
@@ -184,9 +195,9 @@ class TestDB(unittest.TestCase):
         self.assertIn('mock_conn = MagicMock()', modified_tests)
         self.assertIn('mock_cursor = MagicMock()', modified_tests)
         self.assertIn(
-            'mock_cursor.fetchone.return_value = (1, \'test_user\', \'test@example.com\')', modified_tests)
+            'mock_cursor.fetchone.return_value = (1, \'test_user\', \'test@example.com\', \'password123\')', modified_tests)
         self.assertIn(
-            'mock_cursor.fetchall.return_value = [(1, \'test_user\', \'test@example.com\')]', modified_tests)
+            'mock_cursor.fetchall.return_value = [(1, \'test_user\', \'test@example.com\', \'password123\')]', modified_tests)
         self.assertIn('mock_cursor.rowcount = 1', modified_tests)
 
     def test_patch_decorator_placement(self):
@@ -231,7 +242,8 @@ class TestDatabase(unittest.TestCase):
 
         # The database test should have @patch decorator
         self.assertIsNotNone(test_db_line)
-        self.assertIn('@patch("sqlite3.connect")', lines[test_db_line - 1])
+        self.assertIn(
+            '@patch("sqlite3.connect", side_effect=mock_sqlite_connect)', lines[test_db_line - 1])
 
         # The non-database test might not have the decorator
         # (depending on keyword detection)

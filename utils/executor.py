@@ -50,3 +50,23 @@ class SandboxExecutor:
                 timed_out=True,
                 duration_seconds=duration,
             )
+        except FileNotFoundError as exc:
+            duration = time.perf_counter() - started_at
+            return ExecutionResult(
+                command=command,
+                returncode=1,
+                stdout="",
+                stderr=f"Command not found: {command[0]}",
+                timed_out=False,
+                duration_seconds=duration,
+            )
+        except Exception as exc:
+            duration = time.perf_counter() - started_at
+            return ExecutionResult(
+                command=command,
+                returncode=1,
+                stdout="",
+                stderr=f"Error: {str(exc)}",
+                timed_out=False,
+                duration_seconds=duration,
+            )

@@ -712,6 +712,13 @@ class SmartCacheV3:
             # Para falhas, retornamos apenas os metadados
             if isinstance(result, CacheEntry):
                 return result.metadata
+            elif isinstance(result, dict) and 'validation_status' in result:
+                # Se for um dicionário direto (do cache em memória),
+                # precisamos reconstruir os metadados
+                # Para simplificar, vamos buscar do storage diretamente
+                storage_result = self._load_from_storage(key)
+                if storage_result is not None and isinstance(storage_result, CacheEntry):
+                    return storage_result.metadata
 
         return None
 

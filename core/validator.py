@@ -43,6 +43,7 @@ class SolutionValidator:
             r'psycopg2\.connect',
             r'mysql\.connector\.connect',
             r'pymongo\.MongoClient',
+            r'from\s+pymongo\s+import',
             r'engine\s*=\s*create_engine',
             r'Database\.connect',
             r'Connection\(',
@@ -120,16 +121,17 @@ def mock_sqlite_connect(*args, **kwargs):
             modified_tests = '\n'.join(lines)
 
         # Add @patch decorators to test methods that might use database
+        # Simple approach: add patch to all test methods for safety
         lines = modified_tests.split('\n')
-        for i, line in enumerate(lines):
-            if re.match(r'\s*def test_', line) and '@patch' not in lines[i-1:i+1]:
-                # Check if this test method might use database
-                method_body = '\n'.join(lines[i:i+10])  # Look at next 10 lines
-                if any(keyword in method_body.lower() for keyword in ['database', 'db', 'sqlite', 'connect', 'user', 'login']):
-                    # Add patch decorator
-                    indent = re.match(r'(\s*)', line).group(1)
-                    patch_decorator = f'{indent}@patch("sqlite3.connect", side_effect=mock_sqlite_connect)'
-                    lines.insert(i, patch_decorator)
+        # Iterate backwards to avoid issues when inserting
+        for i in range(len(lines) - 1, -1, -1):
+            line = lines[i]
+            if line.strip().startswith('def test_') and '@patch' not in line:
+                # Add patch decorator to all test methods
+                indent = len(line) - len(line.lstrip())
+                patch_decorator = ' ' * indent + \
+                    '@patch("sqlite3.connect", side_effect=mock_sqlite_connect)'
+                lines.insert(i, patch_decorator)
 
         modified_tests = '\n'.join(lines)
 

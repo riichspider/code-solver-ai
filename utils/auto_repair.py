@@ -19,11 +19,11 @@ from utils.executor_v2 import ExecutionResult, ExecutionStatus
 
 class RepairStrategy(Protocol):
     """Protocolo para estratégias de reparo automático."""
-    
+
     def can_repair(self, execution_result: ExecutionResult) -> bool:
         """Verifica se pode reparar o erro."""
         ...
-    
+
     def repair(
         self,
         execution_result: ExecutionResult,
@@ -34,19 +34,19 @@ class RepairStrategy(Protocol):
     ) -> Tuple[str, str, RepairMetadata]:
         """
         Tenta reparar o código.
-        
+
         Args:
             execution_result: Resultado da execução com erro
             original_code: Código original que falhou
             problem_context: Contexto do problema
             language: Linguagem de programação
             **kwargs: Argumentos adicionais
-            
+
         Returns:
             Tupla (código_reparado, explicação, metadados)
         """
         ...
-    
+
     def get_name(self) -> str:
         """Nome da estratégia de reparo."""
         ...
@@ -89,7 +89,7 @@ class RepairResult:
     explanation: str
     metadata: RepairMetadata
     success: bool
-    
+
     @property
     def confidence(self) -> float:
         """Confiança no reparo."""
@@ -98,10 +98,10 @@ class RepairResult:
 
 class ErrorClassifier:
     """Classificador de erros para identificar tipo de problema."""
-    
+
     def __init__(self):
         self.logger = get_logger("error_classifier")
-        
+
         # Padrões para diferentes tipos de erro
         self.error_patterns = {
             ErrorType.SYNTAX_ERROR: [
@@ -162,31 +162,32 @@ class ErrorClassifier:
                 r"timed out"
             ]
         }
-    
+
     def classify_error(self, execution_result: ExecutionResult) -> ErrorType:
         """
         Classifica o tipo de erro baseado na saída de erro.
-        
+
         Args:
             execution_result: Resultado da execução com erro
-            
+
         Returns:
             Tipo de erro identificado
         """
         error_output = execution_result.stderr.lower()
-        
+
         # Verifica timeout primeiro
         if execution_result.timed_out:
             return ErrorType.TIMEOUT_ERROR
-        
+
         # Procura padrões específicos
         import re
         for error_type, patterns in self.error_patterns.items():
             for pattern in patterns:
                 if re.search(pattern, error_output, re.IGNORECASE):
-                    self.logger.debug(f"Error classified as {error_type.value}")
+                    self.logger.debug(
+                        f"Error classified as {error_type.value}")
                     return error_type
-        
+
         # Se não encontrar padrão específico
         self.logger.warning("Could not classify error, treating as unknown")
         return ErrorType.UNKNOWN_ERROR
@@ -194,28 +195,28 @@ class ErrorClassifier:
 
 class PromptBasedRepairStrategy:
     """Estratégia de reparo baseada em prompts para IA."""
-    
+
     def __init__(self, ai_client, logger_name: str = "prompt_repair"):
         self.ai_client = ai_client
         self.logger = get_logger(logger_name)
-    
+
     def can_repair(self, execution_result: ExecutionResult) -> bool:
         """Verifica se pode reparar usando IA."""
         # Pode reparar a maioria dos erros exceto problemas de sistema
         if execution_result.timed_out:
             return False  # Timeout geralmente requer mudança de abordagem
-        
+
         error_classifier = ErrorClassifier()
         error_type = error_classifier.classify_error(execution_result)
-        
+
         # Não tenta reparar erros muito complexos
         non_repairable = {
             ErrorType.MEMORY_ERROR,
             ErrorType.TIMEOUT_ERROR
         }
-        
+
         return error_type not in non_repairable
-    
+
     def repair(
         self,
         execution_result: ExecutionResult,
@@ -226,23 +227,23 @@ class PromptBasedRepairStrategy:
     ) -> Tuple[str, str, RepairMetadata]:
         """
         Tenta reparar usando IA para analisar o erro.
-        
+
         Args:
             execution_result: Resultado com erro
             original_code: Código original
             problem_context: Contexto do problema
             language: Linguagem
             **kwargs: Argumentos adicionais
-            
+
         Returns:
             Código reparado, explicação e metadados
         """
         import time
         start_time = time.time()
-        
+
         error_classifier = ErrorClassifier()
         error_type = error_classifier.classify_error(execution_result)
-        
+
         # Constrói prompt de reparo
         repair_prompt = self._build_repair_prompt(
             original_code=original_code,
@@ -251,7 +252,7 @@ class PromptBasedRepairStrategy:
             language=language,
             error_type=error_type
         )
-        
+
         try:
             # Envia para IA
             response = self.ai_client.generate_text(
@@ -259,7 +260,7 @@ class PromptBasedRepairStrategy:
                 user_prompt=repair_prompt,
                 json_mode=True
             )
-            
+
             # Processa resposta
             repair_data = response.get('content', '{}')
             if isinstance(repair_data, str):
@@ -268,19 +269,22 @@ class PromptBasedRepairStrategy:
                     repair_data = json.loads(repair_data)
                 except json.JSONDecodeError:
                     # Se não for JSON, trata como texto simples
-                    repair_data = {"repaired_code": repair_data, "explanation": "Reparo gerado"}
-            
+                    repair_data = {"repaired_code": repair_data,
+                                   "explanation": "Reparo gerado"}
+
             repaired_code = repair_data.get('repaired_code', original_code)
-            explanation = repair_data.get('explanation', 'Código reparado baseado no erro')
-            applied_fixes = repair_data.get('applied_fixes', ['Correção automática'])
+            explanation = repair_data.get(
+                'explanation', 'Código reparado baseado no erro')
+            applied_fixes = repair_data.get(
+                'applied_fixes', ['Correção automática'])
             confidence = repair_data.get('confidence', 0.7)
-            
+
             # Validação básica
             if repaired_code == original_code:
                 confidence = 0.3  # Baixa confiança se não mudou nada
-            
+
             repair_time = time.time() - start_time
-            
+
             metadata = RepairMetadata(
                 strategy_name=self.get_name(),
                 error_type=error_type,
@@ -292,12 +296,12 @@ class PromptBasedRepairStrategy:
                 applied_fixes=applied_fixes,
                 remaining_issues=[]
             )
-            
+
             return repaired_code, explanation, metadata
-            
+
         except Exception as e:
             self.logger.error(f"Failed to repair with AI: {e}")
-            
+
             # Retorno fallback sem modificações
             repair_time = time.time() - start_time
             metadata = RepairMetadata(
@@ -311,9 +315,9 @@ class PromptBasedRepairStrategy:
                 applied_fixes=[],
                 remaining_issues=[str(e)]
             )
-            
+
             return original_code, f"Falha no reparo: {e}", metadata
-    
+
     def _build_repair_prompt(
         self,
         original_code: str,
@@ -323,7 +327,7 @@ class PromptBasedRepairStrategy:
         error_type: ErrorType
     ) -> str:
         """Constrói prompt para reparo."""
-        
+
         return f"""Analise o erro a seguir e corrija o código {language}.
 
 **Problema Original:**
@@ -355,7 +359,7 @@ class PromptBasedRepairStrategy:
     "applied_fixes": ["lista", "das", "correções", "aplicadas"],
     "confidence": 0.9
 }}"""
-    
+
     def _get_system_prompt(self, language: str) -> str:
         """Retorna prompt de sistema específico para linguagem."""
         return f"""Você é um especialista em debugging e reparo de código {language}.
@@ -368,7 +372,7 @@ Foque em:
 - Explicar claramente o que foi corrigido
 
 Seja conciso e preciso nas suas correções."""
-    
+
     def get_name(self) -> str:
         """Nome da estratégia."""
         return "prompt_based_repair"
@@ -376,17 +380,18 @@ Seja conciso e preciso nas suas correções."""
 
 class PatternBasedRepairStrategy:
     """Estratégia de reparo baseada em padrões conhecidos."""
-    
+
     def __init__(self, logger_name: str = "pattern_repair"):
         self.logger = get_logger(logger_name)
-        
+
         # Padrões de reparo comuns
         self.repair_patterns = {
             ErrorType.SYNTAX_ERROR: [
                 # Correção de indentação
                 (r'^(\s+)(def|class|if|for|while|try|with)', self._fix_indentation),
                 # Correção de dois-pontos faltando
-                (r'(def|class|if|for|while|try|with)([^\n:]+)\s*$', self._add_colon),
+                (r'(def|class|if|for|while|try|with)([^\n:]+)\s*$',
+                 self._add_colon),
                 # Correção de parênteses
                 (r'print\s+[^(]', self._fix_print_statement),
             ],
@@ -400,7 +405,8 @@ class PatternBasedRepairStrategy:
             ],
             ErrorType.TYPE_ERROR: [
                 # Conversões de tipo
-                (r"can't multiply sequence by non-int of type 'str'", self._fix_string_multiplication),
+                (r"can't multiply sequence by non-int of type 'str'",
+                 self._fix_string_multiplication),
                 (r"can only concatenate str", self._fix_string_concatenation),
             ],
             ErrorType.INDEX_ERROR: [
@@ -408,15 +414,15 @@ class PatternBasedRepairStrategy:
                 (r"list index out of range", self._add_bounds_check),
             ]
         }
-    
+
     def can_repair(self, execution_result: ExecutionResult) -> bool:
         """Verifica se pode reparar baseado em padrões."""
         error_classifier = ErrorClassifier()
         error_type = error_classifier.classify_error(execution_result)
-        
+
         # Verifica se tem padrões para este tipo de erro
         return error_type in self.repair_patterns
-    
+
     def repair(
         self,
         execution_result: ExecutionResult,
@@ -427,49 +433,56 @@ class PatternBasedRepairStrategy:
     ) -> Tuple[str, str, RepairMetadata]:
         """
         Tenta reparar usando padrões conhecidos.
-        
+
         Args:
             execution_result: Resultado com erro
             original_code: Código original
             problem_context: Contexto do problema
             language: Linguagem
             **kwargs: Argumentos adicionais
-            
+
         Returns:
             Código reparado, explicação e metadados
         """
         import time
         start_time = time.time()
-        
+
         error_classifier = ErrorClassifier()
         error_type = error_classifier.classify_error(execution_result)
-        
+
         repaired_code = original_code
         applied_fixes = []
-        
+
         # Aplica padrões de reparo
         if error_type in self.repair_patterns:
             for pattern, fix_function in self.repair_patterns[error_type]:
                 import re
-                if re.search(pattern, execution_result.stderr, re.IGNORECASE):
+                # Verifica se o padrão se aplica ao código ou ao erro
+                matches_code = re.search(
+                    pattern, repaired_code, re.IGNORECASE | re.MULTILINE)
+                matches_error = re.search(
+                    pattern, execution_result.stderr, re.IGNORECASE)
+
+                if matches_code or matches_error:
                     try:
-                        new_code = fix_function(repaired_code, execution_result.stderr)
+                        new_code = fix_function(
+                            repaired_code, execution_result.stderr)
                         if new_code != repaired_code:
                             repaired_code = new_code
                             applied_fixes.append(f"Applied pattern: {pattern}")
                     except Exception as e:
                         self.logger.warning(f"Pattern fix failed: {e}")
-        
+
         repair_time = time.time() - start_time
         success = repaired_code != original_code
-        
+
         if success:
             explanation = f"Código reparado usando {len(applied_fixes)} padrões de correção"
             confidence = 0.6  # Confiança moderada para reparos baseados em padrões
         else:
             explanation = "Nenhum padrão de reparo aplicável encontrado"
             confidence = 0.0
-        
+
         metadata = RepairMetadata(
             strategy_name=self.get_name(),
             error_type=error_type,
@@ -481,14 +494,14 @@ class PatternBasedRepairStrategy:
             applied_fixes=applied_fixes,
             remaining_issues=[] if success else ["No applicable patterns found"]
         )
-        
+
         return repaired_code, explanation, metadata
-    
+
     def _fix_indentation(self, code: str, error_output: str) -> str:
         """Corrige problemas de indentação."""
         lines = code.split('\n')
         fixed_lines = []
-        
+
         for line in lines:
             # Corrige indentação inconsistente
             if line.strip() and not line.startswith('    ') and not line.startswith('\t'):
@@ -499,72 +512,72 @@ class PatternBasedRepairStrategy:
                     fixed_lines.append(line)
             else:
                 fixed_lines.append(line)
-        
+
         return '\n'.join(fixed_lines)
-    
+
     def _add_colon(self, code: str, error_output: str) -> str:
         """Adiciona dois-pontos faltando."""
         import re
         # Adiciona dois-pontos após definições de função/classe/condicionais
         return re.sub(r'(def|class|if|for|while|try|with)([^\n:]+)\s*$', r'\1\2:', code, flags=re.MULTILINE)
-    
+
     def _fix_print_statement(self, code: str, error_output: str) -> str:
         """Corrige statement print sem parênteses (Python 2 vs 3)."""
         import re
         # Converte print "texto" para print("texto")
         return re.sub(r'print\s+([^(].*?)$', r'print(\1)', code, flags=re.MULTILINE)
-    
+
     def _suggest_import_fix(self, code: str, error_output: str) -> str:
         """Sugere correção para import error."""
         import re
         match = re.search(r"No module named '(.*)'", error_output)
         if match:
             module_name = match.group(1)
-            
+
             # Sugestões comuns
             suggestions = {
                 'tkinter': 'try:\n    import tkinter\nexcept ImportError:\n    import Tkinter as tkinter',
                 'configparser': 'try:\n    import configparser\nexcept ImportError:\n    import ConfigParser as configparser',
                 'queue': 'try:\n    import queue\nexcept ImportError:\n    import Queue as queue'
             }
-            
+
             if module_name in suggestions:
                 return suggestions[module_name] + '\n\n' + code
-        
+
         return code
-    
+
     def _fix_undefined_variable(self, code: str, error_output: str) -> str:
         """Tenta corrigir variáveis não definidas."""
         import re
         match = re.search(r"name '(.*)' is not defined", error_output)
         if match:
             var_name = match.group(1)
-            
+
             # Adiciona definição padrão para variáveis comuns
             if var_name in ['i', 'j', 'k']:
                 return f"for {var_name} in range(len(data)):\n    pass\n\n" + code
             elif var_name in ['data', 'result', 'output']:
                 return f"{var_name} = []\n" + code
-        
+
         return code
-    
+
     def _fix_string_multiplication(self, code: str, error_output: str) -> str:
         """Corrige multiplicação de string por string."""
         import re
         # Converte "a" * "b" para int("a") * "b" ou similar
         return re.sub(r'"([^"]*)"\s*\*\s*"([^"]*)"', r'int(\1) * "\2"', code)
-    
+
     def _fix_string_concatenation(self, code: str, error_output: str) -> str:
         """Corrige concatenação de tipos incompatíveis."""
         import re
         # Converte str + number para str(number)
         return re.sub(r'(\w+)\s*\+\s*(\d+)', r'str(\1) + str(\2)', code)
-    
+
     def _add_bounds_check(self, code: str, error_output: str) -> str:
         """Adiciona verificação de limites."""
         # Esta é uma correção mais complexa, por ora apenas adiciona comentário
         return "# TODO: Add bounds check for list access\n" + code
-    
+
     def get_name(self) -> str:
         """Nome da estratégia."""
         return "pattern_based_repair"
@@ -573,10 +586,10 @@ class PatternBasedRepairStrategy:
 class AutoRepairManager:
     """
     Gerenciador de auto-repair com múltiplas estratégias.
-    
+
     Implementa Strategy Pattern para selecionar melhor abordagem.
     """
-    
+
     def __init__(
         self,
         strategies: List[RepairStrategy],
@@ -585,7 +598,7 @@ class AutoRepairManager:
     ) -> None:
         """
         Inicializa gerenciador com estratégias injetadas.
-        
+
         Args:
             strategies: Lista de estratégias de reparo
             max_attempts: Número máximo de tentativas
@@ -595,7 +608,7 @@ class AutoRepairManager:
         self.max_attempts = max_attempts
         self.logger = get_logger(logger_name)
         self.error_classifier = ErrorClassifier()
-    
+
     def attempt_repair(
         self,
         execution_result: ExecutionResult,
@@ -606,14 +619,14 @@ class AutoRepairManager:
     ) -> RepairResult:
         """
         Tenta reparar o código usando múltiplas estratégias.
-        
+
         Args:
             execution_result: Resultado da execução com erro
             original_code: Código original que falhou
             problem_context: Contexto do problema
             language: Linguagem de programação
             **kwargs: Argumentos adicionais
-            
+
         Returns:
             Resultado do processo de reparo
         """
@@ -635,22 +648,23 @@ class AutoRepairManager:
                 ),
                 success=True
             )
-        
+
         error_type = self.error_classifier.classify_error(execution_result)
         self.logger.info(f"Attempting repair for {error_type.value}")
-        
+
         best_result = None
         best_confidence = 0.0
-        
+
         # Tenta cada estratégia em ordem
         for strategy in self.strategies:
             if not strategy.can_repair(execution_result):
-                self.logger.debug(f"Strategy {strategy.get_name()} cannot repair this error")
+                self.logger.debug(
+                    f"Strategy {strategy.get_name()} cannot repair this error")
                 continue
-            
+
             try:
                 self.logger.info(f"Trying strategy: {strategy.get_name()}")
-                
+
                 repaired_code, explanation, metadata = strategy.repair(
                     execution_result=execution_result,
                     original_code=original_code,
@@ -658,34 +672,35 @@ class AutoRepairManager:
                     language=language,
                     **kwargs
                 )
-                
+
                 # Atualiza melhor resultado
                 if metadata.confidence > best_confidence:
                     best_confidence = metadata.confidence
                     best_result = RepairResult(
-                        repaired_code=repaid_code,
+                        repaired_code=repaired_code,
                         explanation=explanation,
                         metadata=metadata,
                         success=metadata.success
                     )
-                
+
                 self.logger.info(
                     f"Strategy {strategy.get_name()} completed with "
                     f"confidence: {metadata.confidence:.2f}"
                 )
-                
+
                 # Se encontrou solução com alta confiança, para
                 if metadata.confidence >= 0.8:
                     break
-                    
+
             except Exception as e:
-                self.logger.error(f"Strategy {strategy.get_name()} failed: {e}")
+                self.logger.error(
+                    f"Strategy {strategy.get_name()} failed: {e}")
                 continue
-        
+
         if best_result is None:
             # Nenhuma estratégia funcionou
             self.logger.error("All repair strategies failed")
-            
+
             metadata = RepairMetadata(
                 strategy_name="none",
                 error_type=error_type,
@@ -697,19 +712,19 @@ class AutoRepairManager:
                 applied_fixes=[],
                 remaining_issues=["All strategies failed"]
             )
-            
+
             return RepairResult(
                 repaired_code=original_code,
                 explanation="Nenhuma estratégia de reparo disponível para este erro",
                 metadata=metadata,
                 success=False
             )
-        
+
         self.logger.info(
             f"Best repair result: {best_result.metadata.strategy_name} "
             f"(confidence: {best_result.confidence:.2f})"
         )
-        
+
         return best_result
 
 
@@ -723,24 +738,24 @@ def create_auto_repair_manager(
 ) -> AutoRepairManager:
     """
     Factory function para criar AutoRepairManager com estratégias padrão.
-    
+
     Args:
         ai_client: Cliente IA para estratégia baseada em prompt
         enable_pattern_based: Se deve incluir estratégia baseada em padrões
         enable_prompt_based: Se deve incluir estratégia baseada em prompts
         max_attempts: Número máximo de tentativas
-        
+
     Returns:
         Instância do AutoRepairManager
     """
     strategies: List[RepairStrategy] = []
-    
+
     if enable_pattern_based:
         strategies.append(PatternBasedRepairStrategy())
-    
+
     if enable_prompt_based and ai_client is not None:
         strategies.append(PromptBasedRepairStrategy(ai_client))
-    
+
     return AutoRepairManager(
         strategies=strategies,
         max_attempts=max_attempts
