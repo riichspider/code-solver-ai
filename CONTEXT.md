@@ -214,3 +214,30 @@
 - **Gemini API**: gemini-2.0-flash (prioridade 3, gratuito)
 
 **Commit**: Refatoração e fallback client implementados
+
+## Sessão Integração (07/05/2026)
+**Objetivo**: Integrar src/classifier.py e src/repair_engine.py ao pipeline principal
+
+**Implementado**:
+- ✅ src/classifier_adapter.py — bridge entre dict antigo e ClassificationResult tipado
+- ✅ src/repair_adapter.py — delega _auto_repair() ao RepairEngine
+- ✅ Corrigido import create_smart_cache_v3 em core/pipeline.py
+- ✅ Corrigido assinatura CodeSolver em test_pipeline_extended.py
+- ✅ Corrigido mocks em test_repair_engine.py (execute_code → execute)
+- ✅ Corrigido file handles Windows em test_logger.py
+- ✅ Corrigido import gzip em smart_cache_v2.py
+- ✅ Corrigido markdown n/a fallback para campo generated_at vazio
+- ✅ Resolvidos timeouts em test_cpp.py (regex + loop infinito)
+
+**Métricas**:
+- 283 testes passando, 0 falhas (~7s)
+- 63 falhas históricas zeradas
+- src/classifier.py e src/repair_engine.py integrados e funcionais
+
+**Próximos passos**:
+- Substituir _auto_repair() inline pelo RepairAdapter (passo 3 da integração)
+- Elevar cobertura mínima de 50% para 70%
+- Adicionar bandit e pip-audit no CI
+- Refatorar core/pipeline.py (complexidade 55) em estágios menores
+- Sandbox robusta para validadores (Docker/firejail)
+- Atualizar README/SECURITY: "offline por padrão, fallback remoto opcional"
