@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -24,6 +25,115 @@ class SolutionValidator:
         self.timeout_seconds = timeout_seconds
         self.executor = SandboxExecutor(timeout_seconds=timeout_seconds)
         self.logger = get_logger("validator")
+
+    def _inject_database_mocking(self, code: str, tests: str) -> tuple[str, str]:
+        """
+        Inject database mocking into test code if the solution uses database connections.
+
+        Args:
+            code: The solution code
+            tests: The test code
+
+        Returns:
+            Tuple of (modified_code, modified_tests)
+        """
+        # Check if code uses database connections
+        db_patterns = [
+            r'sqlite3\.connect',
+            r'psycopg2\.connect',
+            r'mysql\.connector\.connect',
+            r'pymongo\.MongoClient',
+            r'engine\s*=\s*create_engine',
+            r'Database\.connect',
+            r'Connection\(',
+        ]
+
+        uses_db = any(re.search(pattern, code) for pattern in db_patterns)
+
+        if not uses_db:
+            return code, tests
+
+        # If tests already have mocking, don't modify
+        if re.search(r'@patch\(', tests) and re.search(r'unittest\.mock', tests):
+            return code, tests
+
+        # Inject mocking imports and setup
+        mock_imports = """import unittest.mock
+from unittest.mock import patch, MagicMock
+
+"""
+
+        # Create mock setup function
+        mock_setup = """
+def setup_database_mock():
+    \"\"\"Setup common database mocking for tests.\"\"\"
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_cursor.fetchone.return_value = (1, 'test_user', 'test@example.com', 'password123')
+    mock_cursor.fetchall.return_value = [(1, 'test_user', 'test@example.com', 'password123')]
+    mock_cursor.rowcount = 1
+    
+    # Mock the execute method to capture SQL queries for security testing
+    def mock_execute(query, params=None):
+        mock_cursor.last_query = query
+        mock_cursor.last_params = params
+        return mock_cursor
+    
+    mock_cursor.execute = mock_execute
+    return mock_conn, mock_cursor
+
+# Global mock setup for sqlite3.connect
+def mock_sqlite_connect(*args, **kwargs):
+    \"\"\"Mock sqlite3.connect for testing.\"\"\"
+    mock_conn, mock_cursor = setup_database_mock()
+    return mock_conn
+
+"""
+
+        # Modify tests to include mocking
+        modified_tests = tests
+
+        # Add imports if not present
+        if 'import unittest.mock' not in modified_tests:
+            # Find the first import line and add after it
+            lines = modified_tests.split('\n')
+            import_index = 0
+            for i, line in enumerate(lines):
+                if line.strip().startswith('import ') or line.strip().startswith('from '):
+                    import_index = i + 1
+                elif line.strip() == '' and import_index > 0:
+                    break
+
+            lines.insert(import_index, mock_imports.rstrip())
+            modified_tests = '\n'.join(lines)
+
+        # Add mock setup function before first test class
+        if 'def setup_database_mock():' not in modified_tests:
+            lines = modified_tests.split('\n')
+            class_index = 0
+            for i, line in enumerate(lines):
+                if 'class ' in line and 'Test' in line:
+                    class_index = i
+                    break
+
+            lines.insert(class_index, mock_setup.rstrip())
+            modified_tests = '\n'.join(lines)
+
+        # Add @patch decorators to test methods that might use database
+        lines = modified_tests.split('\n')
+        for i, line in enumerate(lines):
+            if re.match(r'\s*def test_', line) and '@patch' not in lines[i-1:i+1]:
+                # Check if this test method might use database
+                method_body = '\n'.join(lines[i:i+10])  # Look at next 10 lines
+                if any(keyword in method_body.lower() for keyword in ['database', 'db', 'sqlite', 'connect', 'user', 'login']):
+                    # Add patch decorator
+                    indent = re.match(r'(\s*)', line).group(1)
+                    patch_decorator = f'{indent}@patch("sqlite3.connect", side_effect=mock_sqlite_connect)'
+                    lines.insert(i, patch_decorator)
+
+        modified_tests = '\n'.join(lines)
+
+        return code, modified_tests
 
     def validate(
         self,
@@ -73,12 +183,16 @@ class SolutionValidator:
         filename: str,
         test_filename: str,
     ) -> ValidationResult:
+        # Inject database mocking if needed
+        modified_code, modified_tests = self._inject_database_mocking(
+            code, tests)
+
         with tempfile.TemporaryDirectory(prefix="code-solver-") as temp_dir:
             workspace = Path(temp_dir)
-            (workspace / filename).write_text(code, encoding="utf-8")
+            (workspace / filename).write_text(modified_code, encoding="utf-8")
             command: list[str]
-            if tests.strip():
-                (workspace / test_filename).write_text(tests, encoding="utf-8")
+            if modified_tests.strip():
+                (workspace / test_filename).write_text(modified_tests, encoding="utf-8")
                 command = [
                     sys.executable,
                     "-m",

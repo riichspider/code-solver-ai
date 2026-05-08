@@ -13,6 +13,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from core.pipeline import CodeSolver, ContextItem, SolveRequest
+from core.orchestrator import create_execution_orchestrator, ExecutionOrchestrator
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -80,6 +81,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Imprime resultado bruto em JSON.")
     parser.add_argument("--health-check", action="store_true",
                         help="Verifica saúde do sistema (Ollama, modelos, diretórios).")
+    parser.add_argument("--auto-repair", action="store_true", default=True,
+                        help="Habilita auto-repair automático de código (padrão: True).")
+    parser.add_argument("--no-auto-repair", dest="auto_repair", action="store_false",
+                        help="Desabilita auto-repair automático.")
     return parser
 
 
@@ -127,12 +132,163 @@ def render_result(result, export_paths: dict[str, str] | None = None) -> None:
         console.print(export_table)
 
 
+def render_auto_repair_result(result: dict[str, Any], export_paths: dict[str, str] | None = None) -> None:
+    """Renderiza resultado com informações de auto-repair."""
+
+    # Header com informações básicas
+    header = Table.grid(padding=(0, 2))
+    header.add_row("Problema", result.get("problem", "")[
+                   :50] + "..." if len(result.get("problem", "")) > 50 else result.get("problem", ""))
+    header.add_row("Linguagem", result.get("language", ""))
+    header.add_row("Arquivo", result.get("filename", ""))
+    console.print(Panel.fit(header, title="Resumo"))
+
+    # Status da validação
+    validation = result.get("validation", {})
+    validation_status = "[green]✓ PASSOU[/green]" if validation.get(
+        "success") else "[red]✗ FALHOU[/red]"
+
+    validation_table = Table(
+        title=f"Validação da Execução: {validation_status}")
+    validation_table.add_column("Propriedade")
+    validation_table.add_column("Valor")
+
+    validation_table.add_row("Status", validation_status)
+    validation_table.add_row("Return Code", str(
+        validation.get("return_code", "N/A")))
+    validation_table.add_row(
+        "Execution Time", f"{validation.get('execution_time', 0):.2f}s")
+
+    if validation.get("stdout"):
+        validation_table.add_row("STDOUT", validation["stdout"][:100] + "..." if len(
+            validation["stdout"]) > 100 else validation["stdout"])
+
+    if validation.get("stderr"):
+        validation_table.add_row("STDERR", validation["stderr"][:100] + "..." if len(
+            validation["stderr"]) > 100 else validation["stderr"])
+
+    console.print(validation_table)
+
+    # Informações de reparo
+    repair_info = result.get("repair", {})
+    if repair_info.get("attempts", 0) > 0:
+        repair_status = "[green]✓ SUCESSO[/green]" if repair_info.get(
+            "success") else "[red]✗ FALHOU[/red]"
+
+        repair_table = Table(title=f"Auto-Repair: {repair_status}")
+        repair_table.add_column("Propriedade")
+        repair_table.add_column("Valor")
+
+        repair_table.add_row("Tentativas", str(repair_info.get("attempts", 0)))
+        repair_table.add_row(
+            "Sucesso", "Sim" if repair_info.get("success") else "Não")
+
+        # Histórico de tentativas
+        history = repair_info.get("history", [])
+        if history:
+            for i, attempt in enumerate(history, 1):
+                strategy = attempt.get("strategy", "unknown")
+                success = "[green]✓[/green]" if attempt.get(
+                    "success") else "[red]✗[/red]"
+                confidence = f"{attempt.get('confidence', 0):.2f}"
+                repair_table.add_row(
+                    f"Tentativa {i} ({strategy})", f"{success} (conf: {confidence})")
+
+        console.print(repair_table)
+
+    # Código gerado
+    code = result.get("code", "")
+    if code:
+        code_panel = Panel(
+            code[:1000] + "..." if len(code) > 1000 else code,
+            title=f"Código Gerado ({result.get('filename', 'solution.py')})",
+            expand=False
+        )
+        console.print(code_panel)
+
+    # Explicação
+    explanation = result.get("explanation", "")
+    if explanation:
+        explanation_panel = Panel(
+            explanation,
+            title="Explicação",
+            expand=False
+        )
+        console.print(explanation_panel)
+
+    # Arquivos exportados
+    if export_paths:
+        export_table = Table(title="Arquivos Exportados")
+        export_table.add_column("Tipo")
+        export_table.add_column("Caminho")
+        for key, value in export_paths.items():
+            export_table.add_row(key, value)
+        console.print(export_table)
+
+
 def solve_single(
     solver: CodeSolver,
     problem: str,
     args: argparse.Namespace,
     model_override: str | None = None,
 ) -> None:
+    """Resolve um único problema com ou sem auto-repair."""
+
+    # Se auto-repair estiver habilitado, usa orquestrador
+    if args.auto_repair:
+        try:
+            # Cria orquestrador
+            orchestrator = create_execution_orchestrator(
+                base_dir=BASE_DIR,
+                config={},  # Usa config padrão
+                max_repair_attempts=3
+            )
+
+            # Resolve com auto-repair
+            console.print(
+                "[blue]🔧 Resolvendo com Auto-Repair habilitado...[/blue]")
+            result = orchestrator.solve_with_auto_repair(
+                problem=problem,
+                language=args.language,
+                mode=args.mode,
+                context_items=build_context_items(args.context_file),
+                use_cache=not args.no_cache
+            )
+
+            # Exporta se solicitado
+            export_paths = None
+            if args.export_dir:
+                export_root = Path(args.export_dir)
+                export_root.mkdir(parents=True, exist_ok=True)
+
+                # Exporta código e testes
+                code_file = export_root / result.get("filename", "solution.py")
+                test_file = export_root / \
+                    result.get("test_filename", "test_solution.py")
+
+                code_file.write_text(result.get("code", ""), encoding="utf-8")
+                test_file.write_text(result.get("tests", ""), encoding="utf-8")
+
+                export_paths = {
+                    "Código": str(code_file),
+                    "Testes": str(test_file)
+                }
+
+            # Renderiza resultado
+            if args.json:
+                console.print(json.dumps(result, indent=2, ensure_ascii=False))
+            else:
+                render_auto_repair_result(result, export_paths)
+
+            return
+
+        except Exception as e:
+            console.print(f"[red]❌ Erro no auto-repair: {e}[/red]")
+            console.print(
+                "[yellow]⚠️ Tentando resolver sem auto-repair...[/yellow]")
+            # Fallback para método tradicional
+
+    # Método tradicional sem auto-repair
     request = SolveRequest(
         problem=problem,
         language=args.language,

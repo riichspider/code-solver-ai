@@ -1,0 +1,15 @@
+# Regras Globais do code-solver-ai
+- Sempre responda em Português (Brasil).
+- Use as Skills de 'code-solver-engine' para lógica de IA e 'sandbox-validator' para testes.
+- Ao sugerir mudanças no `smart_cache.py`, mantenha a compatibilidade com o TTL padrão de 24h.
+- Siga as tipagens do Python (type hints) rigorosamente.
+- Use o padrão de projeto Strategy para extensibilidade.
+- Prefira funções puras e evite mutações globais quando possível.
+- Documente todas as mudanças significativas no CHANGELOG.md.
+- Mantenha o código limpo e comentado para facilitar a manutenção.
+- Sempre valide as mudanças antes de aplicá-las.
+- **Design Patterns**: Utilize o padrão mais adequado (Strategy, Factory, Observer, etc.) para garantir extensibilidade e baixo acoplamento.
+- **Princípios SOLID**: Priorize Responsabilidade Única e Inversão de Dependência.
+- **Documentação**: Mantenha o CHANGELOG.md atualizado e use Docstrings em funções complexas.
+- **Testes**: Escreva testes unitários para garantir a qualidade do código.
+- **Segurança**: Valide e sanitize todas as entradas de usuário.

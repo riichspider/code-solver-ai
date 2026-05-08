@@ -10,11 +10,14 @@ import json
 import re
 from dataclasses import asdict
 from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-from core.cache import HistoryStore, SolverCache
-from core.classifier import ProblemClassifier
+from core.cache import HistoryStore
+from utils.smart_cache_v3 import SmartCacheV3, ModelInfo, ValidationStatus, create_smart_cache_v3
+from utils.cache_validator import CacheIntegrationHelper
+from src.classifier_adapter import ClassifierAdapter as ProblemClassifier
 from core.coder import CodeGenerationError, CodeGenerator
 from core.reasoner import ProblemReasoner
 from core.exporter import SolutionExporter
@@ -24,6 +27,8 @@ from core.validator import SolutionValidator
 from models.fallback_client import FallbackClient
 from utils.logger import get_logger, log_pipeline_stage, log_error
 from utils.markdown import render_solution_markdown
+from utils.token_optimizer import TokenOptimizer
+from utils.model_router import IntelligentModelRouter
 
 
 __all__ = ["CodeSolver", "ContextItem", "SolveRequest", "SolveResult"]
@@ -68,13 +73,32 @@ class CodeSolver:
             "history", {}).get("similar_results", 3))
         cache_ttl_hours = int(config.get("cache", {}).get("ttl_hours", 24))
 
-        self.cache = SolverCache(cache_directory, ttl_hours=cache_ttl_hours)
+        self.cache = create_smart_cache_v3(
+            directory=cache_directory,
+            max_size_mb=config.get("cache", {}).get("max_size_mb", 1024),
+            max_entries=config.get("cache", {}).get("max_entries", 500),
+            default_ttl_hours=cache_ttl_hours,
+            compression_level=config.get(
+                "cache", {}).get("compression_level", 6),
+            min_compression_size=config.get("cache", {}).get(
+                "min_compression_size", 1024)
+        )
+
+        # Helper para integração com cache de falhas
+        self.cache_helper = CacheIntegrationHelper(self.cache)
         self.history = HistoryStore(history_path)
-        self.classifier = ProblemClassifier(self.client)
+        self.classifier = ProblemClassifier(ollama_client=self.client)
         self.reasoner = ProblemReasoner(self.client)
         self.coder = CodeGenerator(self.client)
         self.validator = SolutionValidator()
         self.exporter = SolutionExporter(self.base_dir, self.export_directory)
+        self.token_optimizer = TokenOptimizer(
+            max_context_tokens=config.get("optimization", {}).get(
+                "max_context_tokens", 8000)
+        )
+        self.model_router = IntelligentModelRouter(
+            config=config.get("model_routing", {})
+        )
         self._installed_models_cache: list[str] | None = None
         self.logger = get_logger("code_solver")
 
@@ -95,6 +119,8 @@ class CodeSolver:
         return configured
 
     def solve(self, request: SolveRequest) -> SolveResult:
+        if request.problem is None:
+            raise ValueError("O problema não pode ser nulo.")
         problem = request.problem.strip()
         if not problem:
             raise ValueError("O problema não pode estar vazio.")
@@ -103,7 +129,8 @@ class CodeSolver:
         if language not in self.supported_languages:
             language = "python"
         mode = request.mode if request.mode in {"fast", "deep"} else "fast"
-        model, model_resolution = self._resolve_model(request.model)
+        model, model_resolution = self._resolve_model(
+            request.model, problem, language)
 
         log_pipeline_stage(
             self.logger, "solve", "started",
@@ -117,18 +144,86 @@ class CodeSolver:
             },
         )
 
-        context_text = self._format_context_items(request.context_items)
-        cache_key = self.cache.build_key(
-            problem, language, model, mode, context_text)
+        context_text = self._format_context_items(
+            request.context_items, language)
+
+        # Extrai informações do modelo para cache de falhas
+        model_name, model_version = self._parse_model_name(model)
+        model_info = ModelInfo(name=model_name, version=model_version)
+
+        # Verifica cache de sucessos primeiro
         if request.use_cache and self.cache_enabled:
-            cached_payload = self.cache.get(cache_key)
+            cached_payload = self.cache.get_success(
+                problem=problem,
+                model_info=model_info,
+                language=language,
+                mode=mode,
+                context_text=context_text
+            )
             if cached_payload:
                 log_pipeline_stage(
                     self.logger, "solve", "cache_hit",
-                    details={"cache_key": cache_key[:50] + "..."},
+                    details={
+                        "cache_type": "success",
+                        "model": model_info.get_full_identifier(),
+                        "cache_stats": asdict(self.cache.get_stats())
+                    },
                 )
                 cached_payload["cached"] = True
                 return SolveResult.from_dict(cached_payload)
+
+        # Verifica cache de falhas para evitar repetição de erros
+        if request.use_cache and self.cache_enabled:
+            should_attempt, reason, analysis = self.cache_helper.should_attempt_generation(
+                problem=problem,
+                model_info=model_info,
+                language=language,
+                mode=mode,
+                context_text=context_text
+            )
+
+            if not should_attempt:
+                log_pipeline_stage(
+                    self.logger, "solve", "cache_failure_skip",
+                    details={
+                        "reason": reason,
+                        "failure_count": analysis.failure_count,
+                        "confidence": analysis.confidence_to_succeed,
+                        "model": model_info.get_full_identifier()
+                    },
+                )
+
+                # Retorna resultado indicando falha cacheada
+                return SolveResult(
+                    problem=problem,
+                    classification="unknown",
+                    complexity="unknown",
+                    labels=["cache_failure"],
+                    language=language,
+                    model=model,
+                    mode=mode,
+                    understanding=f"Generation skipped due to recent failures: {reason}",
+                    plan_steps=[],
+                    constraints=[],
+                    risks=[],
+                    success_criteria=[],
+                    code="",
+                    tests="",
+                    filename="solution.py",
+                    test_filename="test_solution.py",
+                    explanation=[f"Skipped generation: {reason}"],
+                    validation={"status": "skipped", "errors": [],
+                                "details": analysis.__dict__},
+                    markdown="",
+                    similar_context=[],
+                    metadata={
+                        "cached": True,
+                        "cache_type": "failure",
+                        "skip_reason": reason,
+                        "failure_analysis": analysis.__dict__,
+                        "generated_at": datetime.now(timezone.utc).isoformat()
+                    }
+                )
 
         similar_context = self.history.find_similar(
             problem=problem, language=language, limit=self.similar_results,
@@ -193,6 +288,19 @@ class CodeSolver:
             filename=solution["filename"],
             test_filename=solution["test_filename"],
         )
+
+        # Cache de falhas se validação falhar
+        if validation.get("status") == "failed":
+            validation_error = "; ".join(validation.get("errors", []))
+            self.cache_helper.handle_generation_failure(
+                problem=problem,
+                model_info=model_info,
+                language=language,
+                mode=mode,
+                validation_error=validation_error,
+                validation_status=ValidationStatus.FAILED,
+                context_text=context_text
+            )
 
         repair_applied = False
         should_attempt_repair = (
@@ -278,8 +386,31 @@ class CodeSolver:
         result.history_id = history_id
         payload["history_id"] = history_id
         if request.use_cache and self.cache_enabled:
-            self.cache.set(cache_key, payload)
+            # Cache de sucesso com nova estrutura
+            self.cache.set_success(
+                problem=problem,
+                model_info=model_info,
+                language=language,
+                mode=mode,
+                value=payload,
+                context_text=context_text,
+                ttl_hours=int(self.config.get(
+                    "cache", {}).get("ttl_hours", 24))
+            )
         return result
+
+    def _parse_model_name(self, model: str) -> tuple[str, str]:
+        """Parse model name to extract name and version."""
+        if ":" in model:
+            name, version = model.split(":", 1)
+        else:
+            name, version = model, "latest"
+
+        # Remove @ollama version if present
+        if "@" in version:
+            version = version.split("@")[0]
+
+        return name, version
 
     def solve_batch(self, problems: list[str], template: SolveRequest) -> list[SolveResult]:
         return [
@@ -473,8 +604,8 @@ class CodeSolver:
             self.logger.warning(f"Failed to get installed models: {e}")
             return [], e
 
-    def _resolve_model(self, requested_model: str | None) -> tuple[str, dict[str, Any]]:
-        """Resolve the model to use, falling back to available models."""
+    def _resolve_model(self, requested_model: str | None, problem: str = "", language: str = "python") -> tuple[str, dict[str, Any]]:
+        """Resolve the model to use, with intelligent routing when no specific model requested."""
         installed, lookup_error = self._get_installed_models()
         metadata: dict[str, Any] = {
             "requested_model": requested_model,
@@ -483,8 +614,11 @@ class CodeSolver:
             "fallback_used": False,
             "lookup_error": str(lookup_error) if lookup_error else "",
             "available_models": installed,
+            "routing_used": False,
+            "routing_reasoning": [],
         }
 
+        # If specific model requested, use it (with validation)
         if requested_model:
             if installed and requested_model not in installed:
                 raise ValueError(
@@ -494,6 +628,39 @@ class CodeSolver:
             metadata["resolved_model"] = requested_model
             return requested_model, metadata
 
+        # Use intelligent routing for automatic model selection
+        if problem and installed:
+            try:
+                # Analyze problem for intelligent routing
+                problem_analysis = self.model_router.analyze_problem(
+                    problem, language)
+                recommendation = self.model_router.select_model(
+                    problem_analysis, installed)
+
+                metadata.update({
+                    "resolved_model": recommendation.model,
+                    "routing_used": True,
+                    "routing_category": recommendation.category.value,
+                    "routing_confidence": recommendation.confidence,
+                    "routing_reasoning": recommendation.reasoning,
+                    "problem_complexity": problem_analysis.complexity_score,
+                    "problem_type": problem_analysis.problem_type,
+                })
+
+                self.logger.info(
+                    f"Intelligent routing selected '{recommendation.model}' "
+                    f"(confidence: {recommendation.confidence:.2f}, "
+                    f"category: {recommendation.category.value})"
+                )
+
+                return recommendation.model, metadata
+
+            except Exception as e:
+                self.logger.warning(
+                    f"Intelligent routing failed, falling back: {e}")
+                metadata["routing_error"] = str(e)
+
+        # Fallback to traditional resolution
         if not installed:
             metadata["resolved_model"] = self.default_model
             return self.default_model, metadata
@@ -525,14 +692,41 @@ class CodeSolver:
         profile.pop("reasoning_style", None)  # Handle separately
         return {**base_options, **profile}
 
-    def _format_context_items(self, context_items: list[ContextItem]) -> str:
-        """Format context items for prompt inclusion."""
+    def _format_context_items(self, context_items: list[ContextItem], language: str = "python") -> str:
+        """Format context items for prompt inclusion with token optimization."""
         if not context_items:
             return ""
+
         sections: list[str] = []
         for item in context_items:
-            sections.append(f"### {item.name}\n{item.content.strip()}")
-        return "\n\n".join(sections).strip()
+            # Apply token optimization to each context item
+            optimization_result = self.token_optimizer.optimize_context(
+                item.content.strip(), language
+            )
+
+            # Log optimization results for monitoring
+            if optimization_result.tokens_saved > 0:
+                self.logger.info(
+                    f"Context item '{item.name}' optimized: "
+                    f"{optimization_result.tokens_saved} tokens saved "
+                    f"({optimization_result.tokens_saved/optimization_result.original_tokens:.1%})"
+                )
+
+            sections.append(f"### {item.name}\n{optimization_result.content}")
+
+        # Apply final optimization to the combined context
+        combined_context = "\n\n".join(sections).strip()
+        final_optimization = self.token_optimizer.optimize_context(
+            combined_context, language)
+
+        if final_optimization.tokens_saved > 0:
+            self.logger.info(
+                f"Combined context optimized: "
+                f"{final_optimization.tokens_saved} tokens saved "
+                f"({final_optimization.tokens_saved/final_optimization.original_tokens:.1%})"
+            )
+
+        return final_optimization.content
 
     def _get_file_extension(self, language: str) -> str:
         """Get file extension for programming language."""

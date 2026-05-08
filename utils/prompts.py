@@ -223,6 +223,7 @@ Rules:
 - Tests must be runnable locally and cover the main flow plus edge cases.
 - For Python, prefer unittest and code that can be imported from the generated file.
 - For JavaScript, do not use chai, jest, mocha, vitest, or any third-party package; use only built-in `assert` and optionally `node:test`.
+- When the solution uses SQLite or any database connection, tests MUST use unittest.mock to mock the database connection instead of connecting to a real database. Mock sqlite3.connect, cursor methods, and fetch operations.
 - Never wrap code in markdown fences.
 
 Few-shot quality example:

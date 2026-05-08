@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### 🆕 New Features
+- **Smart Classification Module**: Added `src/classifier.py` with Strategy pattern implementation
+  - **OllamaClassifierStrategy**: AI-powered classification using Ollama models
+  - **RuleBasedClassifierStrategy**: Fallback rule-based classification
+  - **Type-Safe Design**: Rigorous type hints and dataclasses throughout
+  - **JSON Structured Output**: Standardized classification results with confidence levels
+  - **Extensible Architecture**: Easy to add new classification strategies
+
+### ✅ Quality Improvements
+- **37 Unit Tests**: Comprehensive test coverage for all classification components
+- **Strategy Pattern Implementation**: Clean separation of concerns and extensibility
+- **Error Handling**: Robust fallback mechanisms and validation
+- **Documentation**: Extensive docstrings and inline comments
+
+### 🔧 New Features
+- **Smart Repair Engine**: Added `src/repair_engine.py` with SOLID principles
+  - **OllamaRepairStrategy**: AI-powered code repair using Ollama models
+  - **PatternBasedRepairStrategy**: Rule-based fallback for common errors
+  - **Sandbox Integration**: Safe validation with executor_v2
+  - **Type-Safe Design**: Rigorous type hints and dataclasses
+  - **Comprehensive Error Analysis**: Detailed context and traceback processing
+  - **Multi-Attempt Logic**: Configurable repair attempts with fallback
+
+### ✅ Quality Improvements
+- **45 Unit Tests**: Complete test coverage for repair engine components
+- **SOLID Compliance**: Single responsibility, dependency injection, interface segregation
+- **Robust Error Handling**: Graceful degradation and fallback mechanisms
+- **Security Validation**: Integration with sandbox-safe execution
+- **Documentation**: Comprehensive docstrings and usage examples
+
 ## [1.0.0] - 2026-05-05
 
 ### 🎉 Production Release

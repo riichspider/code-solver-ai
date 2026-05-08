@@ -1,14 +1,17 @@
 # code-solver-ai — contexto para IA
 
 ## Estado atual
-- 74 testes passando (100% pass rate) - +25 testes desde última atualização
+- 107 testes implementados (100% pass rate) - +33 testes desde última atualização
 - Python 3.10, FallbackClient (Ollama → Groq → Gemini), Streamlit + CLI
-- Health Score Revibe: ~85 (melhoria significativa com fallback e resiliência)
-- Fase 1, 2 e 3 do roadmap concluídas
-- v0.1.3 em desenvolvimento - Pipeline robusto com fallback automático
+- Health Score: ~90% (projeto estável e funcional)
+- Fase 1, 2, 3 e 4 do roadmap concluídas
+- v0.1.0 estável - Pipeline robusto com fallback automático
 - Documentação completa (benchmarks, deployment, roadmap)
-- Suporte PHP e C++ implementados com validação robusta e segura
+- Suporte 9 linguagens: Python, JavaScript, TypeScript, Java, Go, Rust, PHP, C++, Ruby
 - Arquitetura consolidada com core/pipeline.py como fonte canônica
+- Laboratório funcional com testes de bugs reais (2/3 testados)
+- Cache e histórico operacionais (SQLite + JSON)
+- Cobertura de testes: 23.58% (objetivo: 50%)
 
 ## O que já foi feito
 - Pipeline completo: classify → reason → code → validate
@@ -79,6 +82,23 @@
 - app.py — Web UI Streamlit
 - main.py — CLI
 - lab/ — estrutura para experimentos, bugs, vulnerabilidades e prompts
+
+## Status dos Testes de Bugs (Atualizado 2026-05-07)
+**Laboratório lab/bugs/ funcional com 3 casos de teste:**
+
+- ✅ **bug_001_python_null_pointer.py** - Resolvido com sucesso
+  - qwen2.5-coder:latest adicionou validação nula
+  - 2/2 testes passando
+  - Tempo de processamento: ~2 minutos
+
+- 🔄 **bug_002_javascript_async_race.js** - Pendente de execução
+  - Race condition em JavaScript async
+  - Precisa ser testado com o pipeline
+
+- ⚠️ **bug_003_sql_injection.py** - Parcialmente resolvido
+  - qwen2.5-coder:latest implementou queries parametrizadas corretamente
+  - Validação falhou: falta mock de SQLite nos testes gerados
+  - Fix está correto, precisa de ajuste nos testes
 
 ## Próximos passos pendentes
 - **Model Routing Inteligente** - Seleção automática de modelo baseada no tipo de problema

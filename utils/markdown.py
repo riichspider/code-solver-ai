@@ -64,7 +64,8 @@ def render_solution_markdown(result: dict[str, Any]) -> str:
             "## 9. Validation",
             f"- **Status:** {validation.get('status', 'unknown')}",
             f"- **Tool:** {validation.get('tool', 'n/a')}",
-            f"- **Command:** `{validation.get('command', '')}`" if validation.get("command") else "- **Command:** n/a",
+            f"- **Command:** `{validation.get('command', '')}`" if validation.get(
+                "command") else "- **Command:** n/a",
             f"- **Notes:** {validation.get('notes', '')}",
         ]
     )
@@ -76,7 +77,8 @@ def render_solution_markdown(result: dict[str, Any]) -> str:
     if stderr:
         lines.extend(["", "### Stderr", "```text", stderr, "```"])
 
-    lines.extend(["", "## 10. Success Criteria", *[f"- {item}" for item in result.get("success_criteria", [])]])
+    lines.extend(["", "## 10. Success Criteria", *
+                 [f"- {item}" for item in result.get("success_criteria", [])]])
 
     if similar_context:
         lines.append("")
@@ -91,7 +93,7 @@ def render_solution_markdown(result: dict[str, Any]) -> str:
             [
                 "",
                 "## 12. Metadata",
-                f"- **Generated at:** {metadata.get('generated_at', 'n/a')}",
+                f"- **Generated at:** {metadata.get('generated_at') or 'n/a'}",
                 f"- **Repair applied:** {'yes' if metadata.get('repair_applied') else 'no'}",
                 f"- **Context files:** {', '.join(metadata.get('context_files', [])) or 'none'}",
             ]

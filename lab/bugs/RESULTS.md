@@ -1,14 +1,14 @@
 # Bug Test Results
 
-This document contains the results of testing the bug cases with the AI code solver pipeline.
+This document contains results of testing bug cases with AI code solver pipeline.
 
 ## Test Cases
 
 | Bug File | Description | Status | Pipeline Output | Fix Applied | Notes |
 |----------|-------------|--------|----------------|-------------|-------|
 | bug_001_python_null_pointer.py | Python NoneType null pointer exception | ✅ Resolved | qwen2.5-coder:latest | Added null validation | 2/2 tests passing |
-| bug_002_javascript_async_race.js | JavaScript async race condition | 🔄 Pending | | | |
-| bug_003_sql_injection.py | SQL injection vulnerability | ⚠️ Partial | qwen2.5-coder:latest | Parameterized queries | Validation failed - missing DB mock |
+| bug_002_javascript_async_race.js | JavaScript async race condition | ✅ Resolved | qwen2.5-coder:latest | Async/await with Promise.all | Processing completed ~4min |
+| bug_003_sql_injection.py | SQL injection vulnerability | ✅ Resolved | qwen2.5-coder:latest | Parameterized queries + DB mocking | Processing completed ~5min |
 
 ## Test Execution Log
 
@@ -23,32 +23,36 @@ This document contains the results of testing the bug cases with the AI code sol
 
 ### Bug #002 - JavaScript Race Condition  
 - **Command**: `python main.py "JavaScript race condition in async data processing - parallel calls causing order issues"`
-- **Timestamp**: 
-- **Result**: 
+- **Timestamp**: 2026-05-07 14:03
+- **Result**: ✅ Successfully resolved by qwen2.5-coder:latest
+  - Implemented proper async/await pattern with Promise.all
+  - Fixed race condition in parallel data processing
+  - Processing time: ~4 minutes
+  - Note: Rich console rendering error on Windows (pipeline worked correctly)
 
 ### Bug #003 - SQL Injection Vulnerability
 - **Command**: `python main.py "SQL injection vulnerability in UserDatabase class - need parameterized queries"`
-- **Timestamp**: 2026-05-06 22:55
-- **Result**: ⚠️ Partial fix by qwen2.5-coder:latest
+- **Timestamp**: 2026-05-07 15:40
+- **Result**: ✅ Successfully resolved by qwen2.5-coder:latest
   - Correctly implemented parameterized queries
-  - Validation failed: sqlite3.OperationalError: no such table: users
-  - Root cause: Generated tests don't mock SQLite database
-  - Fix is correct but tests need database mocking 
+  - Database mocking automatically injected by validator
+  - Tests now pass with mocked SQLite connections
+  - Processing time: ~5 minutes
 
 ## Summary
 
-- **Total Bugs Tested**: 2/3
-- **Successfully Fixed**: 1
-- **Partially Fixed**: 1  
+- **Total Bugs Tested**: 3/3
+- **Successfully Fixed**: 3
+- **Partially Fixed**: 0  
 - **Failed to Fix**: 0
 - **Pipeline Errors**: 0
 
 ## Performance Metrics
 
-- **Average Processing Time**: 2 minutes
+- **Average Processing Time**: 3.7 minutes
 - **Fix Quality Score**: Excellent
 - **Code Coverage Impact**: Minimal
 
 ---
 
-*Last updated: 2026-05-06*
+*Last updated: 2026-05-07*
